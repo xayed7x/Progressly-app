@@ -32,7 +32,8 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-origins = ["http://localhost:3000"]
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+origins = [FRONTEND_URL]
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 DBSession = Annotated[Session, Depends(get_session)]
