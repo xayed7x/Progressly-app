@@ -1,0 +1,22 @@
+services:
+  # This is your FastAPI Backend Service
+  - type: web
+    name: progressly-api
+    runtime: python
+    repo: https://github.com/xayed7x/progressly-app # Important: Change this!
+    branch: main
+    rootDir: ./progressly-api
+    plan: free
+    healthCheckPath: /
+    buildFilter:
+      paths:
+        - "progressly-api/**"
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn -w 2 -k uvicorn.workers.UvicornWorker main:app"
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: progressly-db # Important: Change this!
+          property: internalConnectionString
+      - key: CLERK_SECRET_KEY
+        sync: false
