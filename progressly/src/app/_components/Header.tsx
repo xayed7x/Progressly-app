@@ -14,12 +14,15 @@ export default function Header() {
     <header className="border-b border-secondary/10">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         {/* Logo */}
-        <Image
-          src="/images/logo.png"
-          alt="Progressly Logo"
-          width={50}
-          height={32}
-        />
+        <div className="flex items-center gap-x-2">
+          <Image
+            src="/images/logo.png"
+            alt="Progressly Logo"
+            width={50}
+            height={32}
+          />
+          <span className="text-lg font-semibold">Progressly</span>
+        </div>
 
         <div className="flex items-center gap-x-4">
           {/* This part shows only when the user is logged OUT */}
