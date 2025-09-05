@@ -52,7 +52,20 @@ export default function DashboardClientPage({
     fetcher
   );
 
-  const lastEndTime = undefined;
+  let lastEndTime: string | undefined = undefined;
+  if (activities && activities.length > 0) {
+    // Find the activity with the latest end_time
+    const latestActivity = activities.reduce((prev, current) => {
+      const prevEndTime = new Date(`2000-01-01T${prev.end_time}`); // Use a dummy date for time comparison
+      const currentEndTime = new Date(`2000-01-01T${current.end_time}`);
+      return currentEndTime > prevEndTime ? current : prev;
+    });
+
+    // Format the latest end_time to "HH:mm"
+    const latestEndHour = new Date(`2000-01-01T${latestActivity.end_time}`).getHours();
+    const latestEndMinute = new Date(`2000-01-01T${latestActivity.end_time}`).getMinutes();
+    lastEndTime = `${String(latestEndHour).padStart(2, '0')}:${String(latestEndMinute).padStart(2, '0')}`;
+  }
 
   // Calculate disabled states for navigation
   const today = new Date();
