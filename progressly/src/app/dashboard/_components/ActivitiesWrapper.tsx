@@ -1,18 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
 import ActivityList from "./ActivityList";
+import type { Activity } from "@/lib/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-
-// --- Type Definition ---
-type Activity = {
-  id: number;
-  activity_name: string;
-  start_time: string;
-  end_time: string;
-  user_id: string;
-  activity_date: string;
-  category: string;
-};
 
 // --- Data Fetching Function ---
 async function getActivities(): Promise<Activity[]> {

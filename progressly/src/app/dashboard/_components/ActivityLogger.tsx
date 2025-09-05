@@ -13,14 +13,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { logActivity } from "@/app/dashboard/activity-actions"; // 1. Import the action
 import { useRef, useState } from "react";
+import { Category } from "@/lib/types";
 import CategorySelect from "./CategorySelect";
 import SubmitButton from "./SubmitButton";
 import AnimatedPlaceholderInput from "./AnimatedPlaceholderInput";
 
 export default function ActivityLogger({
   lastEndTime,
+  categories,
 }: {
   lastEndTime?: string;
+  categories: Category[];
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const [activityName, setActivityName] = useState("");
@@ -81,7 +84,7 @@ export default function ActivityLogger({
           </div>
           <div className="space-y-2">
             <Label htmlFor="category">Category</Label>
-            <CategorySelect name="category" />
+            <CategorySelect name="category_id" categories={categories} />
           </div>
         </CardContent>
         <CardFooter>

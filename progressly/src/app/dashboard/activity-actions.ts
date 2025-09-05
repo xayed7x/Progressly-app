@@ -18,7 +18,9 @@ export async function logActivity(formData: FormData) {
     activity_name: formData.get("activity_name") as string,
     start_time: formData.get("start_time") as string,
     end_time: formData.get("end_time") as string,
-    category: formData.get("category") as string,
+    category_id: formData.get("category_id")
+      ? Number(formData.get("category_id"))
+      : null,
   };
 
   // Basic validation
@@ -26,7 +28,7 @@ export async function logActivity(formData: FormData) {
     !activityData.activity_name ||
     !activityData.start_time ||
     !activityData.end_time ||
-    !activityData.category
+    activityData.category_id === null
   ) {
     return { success: false, error: "All fields are required." };
   }

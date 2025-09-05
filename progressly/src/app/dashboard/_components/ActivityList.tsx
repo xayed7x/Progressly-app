@@ -1,15 +1,5 @@
 import ActivityCard from "./ActivityCard"; // Import the new component
-
-// Define a type for our Activity object
-type Activity = {
-  id: number;
-  activity_name: string;
-  start_time: string;
-  end_time: string;
-  user_id: string;
-  activity_date: string;
-  category: string;
-};
+import type { Activity } from "@/lib/types";
 
 type ActivityListProps = {
   activities: Activity[];
