@@ -47,15 +47,7 @@ export default function ActivityCard({ activity }: { activity: Activity }) {
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <Card className="bg-secondary/90 text-textDark">
         <CollapsibleTrigger asChild>
-          <div className="grid grid-cols-[auto_1fr_90px_auto] items-center gap-4 p-3 cursor-pointer">
-            {/* Expand/Collapse Chevron Icon */}
-            <ChevronDown
-              size={16}
-              className={`text-textLight transition-transform duration-300 ${
-                isOpen ? "rotate-180" : ""
-              }`}
-            />
-
+          <div className="grid grid-cols-[1fr_90px_auto_auto] items-center gap-4 p-3 cursor-pointer">
             {/* Truncated Activity Name */}
             <p className="font-semibold text-textDark truncate">
               {activity.activity_name}
@@ -87,6 +79,14 @@ export default function ActivityCard({ activity }: { activity: Activity }) {
                 {activity.end_time.slice(0, 5)}
               </span>
             </div>
+
+            {/* Expand/Collapse Chevron Icon */}
+            <ChevronDown
+              size={16}
+              className={`text-textLight transition-transform duration-300 ${
+                isOpen ? "rotate-180" : ""
+              }`}
+            />
           </div>
         </CollapsibleTrigger>
 
