@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { inter, playfair_display, roboto_mono } from "./fonts";
 import "./globals.css";
 import Header from "./_components/Header";
+import PwaUpdater from "./_components/pwa/PwaUpdater";
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
@@ -30,7 +31,8 @@ export default function RootLayout({
         {/* The provider now goes INSIDE the body */}
         <ClerkProvider>
           <div className="font-sans bg-primary text-textLight min-h-screen">
-            <Header />
+                        <Header />
+            <PwaUpdater />
             {children}
           </div>
         </ClerkProvider>
