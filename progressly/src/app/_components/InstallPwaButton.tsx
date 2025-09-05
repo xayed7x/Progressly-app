@@ -44,12 +44,22 @@ export default function InstallPwaButton() {
   }, []);
 
   const handleInstallClick = async () => {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+
     if (!installPrompt) {
-      // This will be the case for iOS/Safari
-      toast({
-        title: "To install this app:",
-        description: "Tap the 'Share' button and then 'Add to Home Screen'.",
-      });
+      if (isIOS) {
+        toast({
+          title: "To install this app:",
+          description: "Tap the 'Share' button and then 'Add to Home Screen'.",
+        });
+      } else {
+        // For Android, if installPrompt is null here, it means the event didn't fire or was already used.
+        // We should not open the dialog or show an install button if there's no prompt to trigger.
+        toast({
+          title: "Installation not available",
+          description: "This device does not support PWA installation, or the prompt has already been dismissed.",
+        });
+      }
       return;
     }
     setIsDialogOpen(true); // Open the custom dialog
@@ -58,10 +68,8 @@ export default function InstallPwaButton() {
   const handleNativePrompt = async () => {
     if (installPrompt) {
       await installPrompt.prompt();
-      const { outcome } = await installPrompt.userChoice;
-      if (outcome === 'accepted') {
-        setInstallPrompt(null); // The prompt can only be used once
-      }
+      // The prompt can only be used once, so set it to null after attempting to prompt.
+      setInstallPrompt(null);
     }
     setIsDialogOpen(false); // Close the custom dialog
   };
