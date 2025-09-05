@@ -21,7 +21,7 @@ export default function GoalForm() {
         <Input name="goal" className="bg-white" required />
       </CardContent>
       <CardFooter>
-        <SubmitButton />
+        <SubmitButton pendingText="Adding Goal...">Add Goal</SubmitButton>
       </CardFooter>
     </form>
   );

@@ -117,7 +117,7 @@ export default function CreateCategoryDialog({
                 Cancel
               </Button>
             </DialogClose>
-            <SubmitButton>Create Category</SubmitButton>
+                        <SubmitButton pendingText="Creating...">Create Category</SubmitButton>
           </DialogFooter>
         </form>
       </DialogContent>

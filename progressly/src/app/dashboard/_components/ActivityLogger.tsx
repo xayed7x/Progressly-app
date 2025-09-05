@@ -88,7 +88,7 @@ export default function ActivityLogger({
           </div>
         </CardContent>
         <CardFooter>
-          <SubmitButton />
+          <SubmitButton pendingText="Logging...">Log Activity</SubmitButton>
         </CardFooter>
       </Card>
     </form>

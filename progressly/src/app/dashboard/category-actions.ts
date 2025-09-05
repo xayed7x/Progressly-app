@@ -7,7 +7,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 // --- Action to CREATE a new category ---
 export async function createCategory(formData: FormData) {
-  const { getToken } = auth();
+  const { getToken } = await auth();
   const token = await getToken({ template: "fastapi" });
 
   if (!token) {
