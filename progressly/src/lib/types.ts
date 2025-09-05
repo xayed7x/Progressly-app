@@ -1,27 +1,27 @@
-// src/lib/types.ts
-
-// This defines the structure of a single Category object
-// as it comes from our FastAPI backend.
-export interface Category {
-  id: number;
-  name: string;
-  color: string;
-  is_default: boolean;
-}
-
-// This defines the new structure of a single Activity object.
-// Notice how it now contains a nested 'category' object.
-export interface Activity {
-  id: number;
+export type Activity = {
+  id: string;
   activity_name: string;
   start_time: string;
   end_time: string;
+  category_id: string;
+  created_at: string;
+  updated_at: string;
   activity_date: string;
-  category_id: number | null;
-  category: Category | null; // The nested category object
-}
+};
 
-// This type must match the DailySummaryItem Pydantic model in our FastAPI backend
+export type Category = {
+  id: string;
+  name: string;
+  user_id: string;
+  created_at: string;
+  updated_at: string;
+  color: string;
+};
+
+export type ActivityReadWithCategory = Activity & {
+  category: Category;
+};
+
 export type DailySummaryItem = {
   category_id: number;
   category_name: string;

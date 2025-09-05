@@ -114,7 +114,7 @@ export function DailySummaryChart({ selectedDate }: DailySummaryChartProps) {
   const apiUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/summary/daily/${dateString}`;
 
   // Use useSWR with single string key that changes when selectedDate changes
-  const { data, error, isLoading } = useSWR<DailySummaryItem[]>(
+  const { data = [], error, isLoading } = useSWR<DailySummaryItem[]>(
     apiUrl,
     fetcher
   );

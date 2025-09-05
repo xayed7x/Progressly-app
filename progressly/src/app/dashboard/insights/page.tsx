@@ -10,7 +10,7 @@ export default function InsightsPage() {
       </p>
 
       <div className="max-w-4xl mx-auto">
-        <DailySummaryChart />
+        <DailySummaryChart selectedDate={new Date()} />
       </div>
     </div>
   );

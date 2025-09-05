@@ -27,3 +27,5 @@ export default function ActivityList({ activities }: ActivityListProps) {
     </div>
   );
 }
+
+
