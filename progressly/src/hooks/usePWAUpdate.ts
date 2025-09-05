@@ -31,7 +31,7 @@ export const usePWAUpdate = () => {
     // A new service worker has successfully installed and is waiting to activate.
     const handleWaiting = (event: any) => {
       setIsUpdateAvailable(true);
-      setWaitingWorker(wb.sw);
+      setWaitingWorker(event.sw);
     };
 
     wb.addEventListener("waiting", handleWaiting);
@@ -66,4 +66,5 @@ export const usePWAUpdate = () => {
 
   return { isUpdateAvailable, triggerUpdate };
 };
+
 
