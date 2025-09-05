@@ -4,6 +4,16 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast"; // Corrected import path
 import { ArrowDownToLine } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 // Define the interface for the BeforeInstallPromptEvent
 interface BeforeInstallPromptEvent extends Event {
@@ -17,6 +27,7 @@ interface BeforeInstallPromptEvent extends Event {
 
 export default function InstallPwaButton() {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -41,13 +52,18 @@ export default function InstallPwaButton() {
       });
       return;
     }
+    setIsDialogOpen(true); // Open the custom dialog
+  };
 
-    // This is for Android/Chrome
-    await installPrompt.prompt();
-    const { outcome } = await installPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setInstallPrompt(null); // The prompt can only be used once
+  const handleNativePrompt = async () => {
+    if (installPrompt) {
+      await installPrompt.prompt();
+      const { outcome } = await installPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setInstallPrompt(null); // The prompt can only be used once
+      }
     }
+    setIsDialogOpen(false); // Close the custom dialog
   };
 
   // Only show the button if the app is not already installed and there's a prompt
@@ -57,8 +73,26 @@ export default function InstallPwaButton() {
   }
 
   return (
-    <Button onClick={handleInstallClick} variant="ghost" size="icon" aria-label="Install App">
-      <ArrowDownToLine className="h-5 w-5" />
-    </Button>
+    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <DialogTrigger asChild>
+        <Button onClick={handleInstallClick} variant="ghost" size="icon" aria-label="Install App">
+          <ArrowDownToLine className="h-5 w-5" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-sm bg-white">
+        <DialogHeader>
+          <DialogTitle>Install Progressly</DialogTitle>
+          <DialogDescription>
+            To install Progressly, click the button below. This will open your browser's installation prompt.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button onClick={handleNativePrompt} className="bg-accent text-accent-foreground">Install App</Button>
+          <DialogClose asChild>
+            <Button variant="outline">Cancel</Button>
+          </DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
