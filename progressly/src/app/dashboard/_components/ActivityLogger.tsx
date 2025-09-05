@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -11,7 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { logActivity } from "@/app/dashboard/activity-actions"; // 1. Import the action
+import { logActivity } from "@/app/dashboard/activity-actions";
 import { useRef, useState } from "react";
 import { Category } from "@/lib/types";
 import CategorySelect from "./CategorySelect";
@@ -21,22 +20,23 @@ import AnimatedPlaceholderInput from "./AnimatedPlaceholderInput";
 export default function ActivityLogger({
   lastEndTime,
   categories,
+  onActivityLogged,
 }: {
   lastEndTime?: string;
   categories: Category[];
+  onActivityLogged: () => void;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const [activityName, setActivityName] = useState("");
 
   return (
-    // 2. Wrap in a form and connect the action
     <form
       ref={formRef}
       action={async (formData) => {
         const result = await logActivity(formData);
         if (result.success) {
           setActivityName(""); // Clear the activity name input
-          // formRef.current?.reset(); // This is no longer needed for activityName
+          onActivityLogged(); // Revalidate the activities list
         } else {
           // Optional: Handle error display
           alert(result.error);
@@ -64,7 +64,7 @@ export default function ActivityLogger({
               <Label htmlFor="start-time">Start Time</Label>
               <Input
                 id="start-time"
-                name="start_time" // Add name attribute
+                name="start_time"
                 type="time"
                 className="bg-white"
                 defaultValue={lastEndTime}
@@ -75,7 +75,7 @@ export default function ActivityLogger({
               <Label htmlFor="end-time">End Time</Label>
               <Input
                 id="end-time"
-                name="end_time" // Add name attribute
+                name="end_time"
                 type="time"
                 className="bg-white"
                 required

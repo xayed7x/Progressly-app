@@ -1,12 +1,12 @@
-import ActivityCard from "./ActivityCard"; // Import the new component
-import type { Activity } from "@/lib/types";
+import ActivityCard from "./ActivityCard";
+import type { ActivityReadWithCategory } from "@/lib/types";
 
 type ActivityListProps = {
-  activities: Activity[];
+  activities: ActivityReadWithCategory[];
 };
 
 export default function ActivityList({ activities }: ActivityListProps) {
-  if (activities.length === 0) {
+  if (!activities || activities.length === 0) {
     return null;
   }
 
@@ -14,13 +14,14 @@ export default function ActivityList({ activities }: ActivityListProps) {
   const chronologicalActivities = [...activities].reverse();
 
   return (
-    <div className="w-full max-w-lg space-y-4">
-      <h2 className="text-xl font-semibold text-secondary text-center">
-        Today's Log
-      </h2>
-      <div className="space-y-3">
-        {chronologicalActivities.map((activity) => (
-          <ActivityCard key={activity.id} activity={activity} />
+    <div className="w-full max-w-lg">
+      {/* The list of activity cards */}
+      <div className="relative space-y-4">
+        {/* The vertical timeline line */}
+        <div className="absolute left-6 top-0 h-full w-0.5 bg-muted" />
+
+        {chronologicalActivities.map((activity, index) => (
+          <ActivityCard key={activity.id} activity={activity} index={index} />
         ))}
       </div>
     </div>

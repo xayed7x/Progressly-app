@@ -4,6 +4,7 @@ import {
   SignedIn,
   SignedOut,
   UserButton,
+  ClerkLoaded,
 } from "@clerk/nextjs";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -22,27 +23,29 @@ export default function Header() {
         />
 
         <div className="flex items-center gap-x-4">
-          {/* This part shows only when the user is logged OUT */}
-          <SignedOut>
-            <SignInButton mode="modal">
-              <Button className="bg-accent1 text-primary hover:bg-accent1/90">
-                Sign In
-              </Button>
-            </SignInButton>
-            <SignUpButton mode="modal">
-              <Button className="bg-accent1 text-primary hover:bg-accent1/90">
-                Sign Up
-              </Button>
-            </SignUpButton>
-          </SignedOut>
+          <ClerkLoaded>
+            {/* This part shows only when the user is logged OUT */}
+            <SignedOut>
+              <SignInButton mode="modal">
+                <Button className="bg-accent1 text-primary hover:bg-accent1/90">
+                  Sign In
+                </Button>
+              </SignInButton>
+              <SignUpButton mode="modal">
+                <Button className="bg-accent1 text-primary hover:bg-accent1/90">
+                  Sign Up
+                </Button>
+              </SignUpButton>
+            </SignedOut>
 
-          {/* This part shows only when the user is logged IN */}
-          <SignedIn>
-            <div className="flex items-center gap-x-2">
-              <InstallPwaButton />
-              <UserButton />
-            </div>
-          </SignedIn>
+            {/* This part shows only when the user is logged IN */}
+            <SignedIn>
+              <div className="flex items-center gap-x-2">
+                <InstallPwaButton />
+                <UserButton />
+              </div>
+            </SignedIn>
+          </ClerkLoaded>
         </div>
       </div>
     </header>

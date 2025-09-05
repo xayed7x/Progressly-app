@@ -1,85 +1,71 @@
-"use client";
+import { ActivityReadWithCategory } from "@/lib/types";
+import { format, parse } from "date-fns";
+import { Badge } from "@/components/ui/badge"; // We are bringing the Badge back!
 
-import { useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { Clock, ChevronDown } from "lucide-react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+// A predefined, tasteful color palette for the card backgrounds.
+const cardColorPalette = [
+  "#2D3748", // Slate Gray
+  "#4A5568", // Darker Gray
+  "#2B6CB0", // Cool Blue
+  "#2C5282", // Darker Blue
+  "#38A169", // Muted Green
+];
 
-import { categoryStyles } from "@/lib/constants";
-import type { Activity } from "@/lib/types";
-
-const getShortCategoryName = (name: string) => {
-  return name.split(/[-\s/]/)[0];
+const formatTime = (timeStr: string | undefined) => {
+  if (!timeStr) return "N/A";
+  try {
+    const time = parse(timeStr, "HH:mm:ss", new Date());
+    return format(time, "h:mm a");
+  } catch (error) {
+    console.error("Invalid time format passed to formatTime:", timeStr);
+    return "Invalid Time";
+  }
 };
 
-export default function ActivityCard({ activity }: { activity: Activity }) {
-  const [isOpen, setIsOpen] = useState(false);
+export default function ActivityCard({
+  activity,
+  index, // We now accept an 'index' to calculate the background color
+}: {
+  activity: ActivityReadWithCategory;
+  index: number;
+}) {
+  // --- COLOR LOGIC ---
+  // The card background cycles through our predefined palette.
+  const cardBackgroundColor = cardColorPalette[index % cardColorPalette.length];
+  // The timeline dot and category badge use the actual color from the database.
+  const categoryColor = activity.category?.color || "#A0AEC0"; // Fallback to a light gray
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <Card className="bg-secondary/90 text-textDark">
-        <CollapsibleTrigger asChild>
-          <div className="grid grid-cols-[1fr_90px_auto_auto] items-center gap-4 p-3 cursor-pointer">
-            {/* Truncated Activity Name */}
-            <p className="font-semibold text-textDark truncate">
-              {activity.activity_name}
-            </p>
+    // Root container for timeline structure
+    <div className="relative">
+      
 
-            {/* Category Badge with Tooltip */}
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Badge
-                    style={{ backgroundColor: activity.category?.color || undefined }}
-                    className={`max-w-[80px] truncate flex justify-center items-center text-center`}
-                  >
-                    {getShortCategoryName(activity.category?.name || "Other")}
-                  </Badge>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{activity.category?.name || "Other"}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-
-            {/* Time */}
-            <div className="flex items-center gap-2 text-xs text-textLight font-mono">
-              <Clock size={12} />
-              <span>
-                {activity.start_time.slice(0, 5)} -{" "}
-                {activity.end_time.slice(0, 5)}
-              </span>
-            </div>
-
-            {/* Expand/Collapse Chevron Icon */}
-            <ChevronDown
-              size={16}
-              className={`text-textLight transition-transform duration-300 ${
-                isOpen ? "rotate-180" : ""
-              }`}
-            />
-          </div>
-        </CollapsibleTrigger>
-
-        {/* Collapsible Content Area */}
-        <CollapsibleContent className="px-3 pb-3 pl-12">
-          <p className="text-textDark/80 text-sm whitespace-normal">
+      {/* 2. The Main Card: Now uses the shuffling background color. */}
+      <div
+        className="p-4 rounded-lg text-white"
+        style={{ backgroundColor: cardBackgroundColor }}
+      >
+        {/* 3. The New 3-Tier Layout */}
+        <div className="flex flex-col gap-2">
+          {/* Tier 1: Activity Name (Prominent) */}
+          <span className="font-semibold truncate text-base">
             {activity.activity_name}
-          </p>
-          {/* This is where you can add more details in the future, like notes */}
-        </CollapsibleContent>
-      </Card>
-    </Collapsible>
+          </span>
+
+          {/* Tier 2 & 3: Time Span and Category Badge on one line */}
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-white/70">
+              {formatTime(activity.start_time)} - {formatTime(activity.end_time)}
+            </span>
+            <Badge
+              style={{ backgroundColor: categoryColor, color: "#FFFFFF" }}
+              className="max-w-[150px] truncate"
+            >
+              {activity.category?.name || "Other"}
+            </Badge>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

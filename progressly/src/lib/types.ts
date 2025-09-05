@@ -20,3 +20,11 @@ export interface Activity {
   category_id: number | null;
   category: Category | null; // The nested category object
 }
+
+// This type must match the DailySummaryItem Pydantic model in our FastAPI backend
+export type DailySummaryItem = {
+  category_id: number;
+  category_name: string;
+  category_color: string;
+  total_duration_minutes: number;
+};
