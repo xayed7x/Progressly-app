@@ -2,6 +2,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import type { Workbox } from "workbox-window";
+
+// It's good practice to declare the type for the window object
+declare global {
+  interface Window {
+    workbox: Workbox;
+  }
+}
 
 export const usePWAUpdate = () => {
   const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
@@ -10,54 +18,52 @@ export const usePWAUpdate = () => {
   );
 
   useEffect(() => {
-    // This effect runs only in the browser
-    if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
+    if (
+      typeof window === "undefined" ||
+      !("serviceWorker" in navigator) ||
+      !window.workbox
+    ) {
       return;
     }
 
-    const registerServiceWorker = async () => {
-      try {
-        const registration = await navigator.serviceWorker.getRegistration();
-        if (registration?.waiting) {
-          // A new service worker is already waiting
-          setWaitingWorker(registration.waiting);
-          setIsUpdateAvailable(true);
-        }
+    const wb = window.workbox;
 
-        // Listen for new workers that enter the waiting state
-        navigator.serviceWorker.addEventListener("controllerchange", () => {
-          // This event fires when the new service worker has taken control
-          // At this point, it's safe to reload the page to see the changes
-          window.location.reload();
-        });
+    // A new service worker has successfully installed and is waiting to activate.
+    const handleWaiting = (event: any) => {
+      setIsUpdateAvailable(true);
+      setWaitingWorker(wb.sw);
+    };
 
-        // Listen for updates to the service worker registration
-        registration?.addEventListener("updatefound", () => {
-          const newWorker = registration.installing;
-          if (newWorker) {
-            newWorker.addEventListener("statechange", () => {
-              if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
-                // New worker is installed and waiting
-                setWaitingWorker(newWorker);
-                setIsUpdateAvailable(true);
-              }
-            });
-          }
-        });
-      } catch (error) {
-        console.error("Error during service worker registration:", error);
+    wb.addEventListener("waiting", handleWaiting);
+
+    // This event fires when the new service worker has taken control.
+    // At this point, it's safe to reload the page to see the changes.
+    const handleControlling = (event: any) => {
+      if (event.isUpdate) {
+        window.location.reload();
       }
     };
 
-    registerServiceWorker();
+    wb.addEventListener("controlling", handleControlling);
+
+    // Register the service worker.
+    // This should be done after adding the event listeners.
+    wb.register();
+
+    return () => {
+      wb.removeEventListener("waiting", handleWaiting);
+      wb.removeEventListener("controlling", handleControlling);
+    };
   }, []);
 
   const triggerUpdate = () => {
     if (waitingWorker) {
-      // Send a message to the waiting service worker to skip the waiting phase
+      // Send a message to the waiting service worker to skip the waiting phase.
+      // This is the command that the user initiates by clicking "Update".
       waitingWorker.postMessage({ type: "SKIP_WAITING" });
     }
   };
 
   return { isUpdateAvailable, triggerUpdate };
 };
+

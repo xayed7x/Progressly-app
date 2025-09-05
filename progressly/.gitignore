@@ -1,0 +1,37 @@
+# Next.js production build output
+.next/
+out/
+
+# Dependencies
+node_modules/
+
+# Environment variables
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Next.js specific
+next-env.d.ts
+
+# Vercel artifacts
+.vercel/
+
+# npm package manager cache
+package-lock.json
+
+# Logs
+*.log
+
+# Local development files
+.DS_Store
+.vscode/
+
+# PWA related files that are generated
+public/sw.js
+public/workbox-*.js
+public/swe-worker-development.js
