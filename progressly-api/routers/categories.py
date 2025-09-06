@@ -40,7 +40,46 @@ router = APIRouter(
 
 @router.get("", response_model=List[CategoryRead])
 def get_user_categories(db: DBSession, clerk_session: ClerkSession):
+    # Get the User ID from the authenticated Clerk session
     user_id = clerk_session.payload['sub']
+    
+    # Check for Existing Defaults: Query to check if any categories exist for this user_id where is_default=True
+    existing_defaults = db.exec(
+        select(Category).where(Category.user_id == user_id, Category.is_default == True)
+    ).all()
+    
+    # The Critical if Statement: If no defaults exist, trigger seeding logic
+    if not existing_defaults:
+        # Create the 13 default category objects in memory
+        default_categories_data = [
+            {"name": "Work", "color": "#3b82f6"}, 
+            {"name": "Study", "color": "#22c55e"},
+            {"name": "Skill Development", "color": "#14b8a6"}, 
+            {"name": "Spiritual & Faith", "color": "#f59e0b"},
+            {"name": "Health & Fitness", "color": "#ef4444"}, 
+            {"name": "Personal Time", "color": "#8b5cf6"},
+            {"name": "Family & Social", "color": "#eab308"}, 
+            {"name": "Social Media", "color": "#ec4899"},
+            {"name": "Leisure & Hobbies", "color": "#06b6d4"}, 
+            {"name": "Eating & Nutrition", "color": "#f97316"},
+            {"name": "Transportation", "color": "#64748b"}, 
+            {"name": "Home & Chores", "color": "#78716c"},
+            {"name": "Sleep", "color": "#4f46e5"},
+        ]
+        
+        # Add all 13 of these new objects to the database session and commit
+        for cat_data in default_categories_data:
+            new_category = Category(
+                name=cat_data["name"], 
+                color=cat_data["color"], 
+                user_id=user_id, 
+                is_default=True
+            )
+            db.add(new_category)
+        
+        db.commit()
+    
+    # Return the Complete List: Fetch the user's complete list (defaults + custom) and return
     user_categories = db.exec(
         select(Category).where(Category.user_id == user_id)
     ).all()
