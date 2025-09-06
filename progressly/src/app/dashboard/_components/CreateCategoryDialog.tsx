@@ -74,7 +74,10 @@ export default function CreateCategoryDialog({
       }}
     >
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-[425px] bg-secondary">
+      <DialogContent 
+        className="sm:max-w-[425px] bg-secondary"
+        onInteractOutside={(event) => event.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle className="font-serif text-2xl text-textDark">
             Create New Category
