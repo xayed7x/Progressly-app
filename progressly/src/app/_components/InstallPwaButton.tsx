@@ -29,42 +29,28 @@ export default function InstallPwaButton() {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
-  const [showButton, setShowButton] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     // Check if app is already installed
     if (window.matchMedia('(display-mode: standalone)').matches) {
       setIsInstalled(true);
-      setShowButton(false);
       return;
     }
 
     const handleBeforeInstallPrompt = (e: Event) => {
-      console.log('beforeinstallprompt event fired');
       e.preventDefault();
       setInstallPrompt(e as BeforeInstallPromptEvent);
-      setShowButton(true);
     };
 
     const handleAppInstalled = () => {
       setIsInstalled(true);
       setInstallPrompt(null);
-      setShowButton(false);
       toast({
         title: "App Installed!",
         description: "Progressly has been installed successfully.",
       });
     };
-
-    // Check if we're in a supported browser
-    const isSupportedBrowser = /Chrome|Edge|Safari|Firefox/.test(navigator.userAgent);
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    
-    // Show button for iOS or supported browsers
-    if (isIOS || isSupportedBrowser) {
-      setShowButton(true);
-    }
 
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
     window.addEventListener("appinstalled", handleAppInstalled);
@@ -117,14 +103,7 @@ export default function InstallPwaButton() {
     return null;
   }
 
-  // TEMPORARY: Always show button for debugging
-  // TODO: Remove this after testing
-  console.log('InstallPwaButton render:', { showButton, installPrompt, isInstalled });
-  
-  // Show button if conditions are met OR for debugging
-  if (!showButton && process.env.NODE_ENV !== 'development') {
-    return null;
-  }
+  // Always show install button if not installed
 
   return (
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -141,14 +120,15 @@ export default function InstallPwaButton() {
               <span>Click the button below to install Progressly on your device.</span>
             ) : (
               <div className="space-y-3">
-                <div><strong>To install this app:</strong></div>
+                <div><strong>To install Progressly:</strong></div>
                 <div className="space-y-2 text-sm">
-                  <div><strong>Chrome/Edge:</strong> Look for the install icon (⬇️) in the address bar, or click the three dots menu → "Install Progressly"</div>
-                  <div><strong>Mobile Chrome:</strong> Tap the menu (⋮) → "Add to Home screen" or "Install app"</div>
-                  <div><strong>iOS Safari:</strong> Tap the Share button (□↗) → "Add to Home Screen"</div>
-                  <div><strong>Firefox:</strong> Look for the install icon in the address bar</div>
+                  <div><strong>Chrome/Edge:</strong> Look for the install icon (⬇️) in the address bar</div>
+                  <div><strong>Or:</strong> Click the three dots menu (⋮) → "Install Progressly"</div>
+                  <div><strong>Mobile:</strong> Tap the menu → "Add to Home screen" or "Install app"</div>
                 </div>
-                <div className="text-xs text-gray-500">Note: The install prompt may not appear in development mode. Try building for production or using HTTPS.</div>
+                <div className="text-xs text-blue-600">
+                  💡 <strong>Tip:</strong> If you don't see the install icon, try refreshing the page or using incognito mode.
+                </div>
               </div>
             )}
           </DialogDescription>

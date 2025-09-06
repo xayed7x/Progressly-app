@@ -8,8 +8,8 @@ import PwaInstaller from "./_components/PwaInstaller";
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: "Progressly",
-  description: "The luxury productivity app.",
+  title: "Progressly - The Luxury Productivity App",
+  description: "The luxury productivity app for tracking your daily activities and goals.",
   manifest: "/manifest.json",
   appleWebApp: {
     title: "Progressly",
@@ -20,6 +20,9 @@ export const metadata: Metadata = {
     "mobile-web-app-capable": "yes",
     "apple-mobile-web-app-capable": "yes",
     "apple-mobile-web-app-status-bar-style": "default",
+    "application-name": "Progressly",
+    "msapplication-TileColor": "#000000",
+    "msapplication-config": "/browserconfig.xml",
   },
 };
 
