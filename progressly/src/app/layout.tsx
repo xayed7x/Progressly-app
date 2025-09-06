@@ -4,6 +4,7 @@ import { inter, playfair_display, roboto_mono } from "./fonts";
 import "./globals.css";
 import Header from "./_components/Header";
 import { Toaster } from "@/components/ui/toaster";
+import { PwaUpdater } from "@/components/PwaUpdater";
 
 export const metadata: Metadata = {
   // Basic SEO Meta Tags
@@ -164,6 +165,7 @@ export default function RootLayout({
             <Header />
             {children}
           </div>
+          <PwaUpdater />
         </ClerkProvider>
         <Toaster />
       </body>
