@@ -11,6 +11,7 @@
   "lang": "en",
   "categories": ["productivity", "lifestyle", "utilities"],
   "prefer_related_applications": false,
+  "id": "/",
   "icons": [
     {
       "src": "/web-app-manifest-192x192.png",

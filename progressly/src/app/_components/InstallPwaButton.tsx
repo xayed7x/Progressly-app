@@ -28,23 +28,15 @@ interface BeforeInstallPromptEvent extends Event {
 export default function InstallPwaButton() {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isInstalled, setIsInstalled] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    // Check if app is already installed
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-      setIsInstalled(true);
-      return;
-    }
-
     const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
+      // Don't prevent default - let the browser handle the install prompt
       setInstallPrompt(e as BeforeInstallPromptEvent);
     };
 
     const handleAppInstalled = () => {
-      setIsInstalled(true);
       setInstallPrompt(null);
       toast({
         title: "App Installed!",
@@ -98,17 +90,17 @@ export default function InstallPwaButton() {
     setIsDialogOpen(false);
   };
 
-  // Don't show button if already installed
-  if (isInstalled) {
-    return null;
-  }
-
-  // Always show install button if not installed
+  // SIMPLE: Always show the install button - no conditions, no complexity
 
   return (
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
       <DialogTrigger asChild>
-        <Button onClick={handleInstallClick} variant="ghost" size="icon" aria-label="Install App">
+        <Button 
+          onClick={handleInstallClick} 
+          variant="ghost" 
+          size="icon" 
+          aria-label="Install App"
+        >
           <ArrowDownToLine className="h-5 w-5" />
         </Button>
       </DialogTrigger>
@@ -122,12 +114,9 @@ export default function InstallPwaButton() {
               <div className="space-y-3">
                 <div><strong>To install Progressly:</strong></div>
                 <div className="space-y-2 text-sm">
-                  <div><strong>Chrome/Edge:</strong> Look for the install icon (⬇️) in the address bar</div>
-                  <div><strong>Or:</strong> Click the three dots menu (⋮) → "Install Progressly"</div>
+                  <div><strong>Chrome/Edge:</strong> Click the three dots menu (⋮) → "Install Progressly"</div>
                   <div><strong>Mobile:</strong> Tap the menu → "Add to Home screen" or "Install app"</div>
-                </div>
-                <div className="text-xs text-blue-600">
-                  💡 <strong>Tip:</strong> If you don't see the install icon, try refreshing the page or using incognito mode.
+                  <div><strong>Firefox:</strong> Click the menu → "Install"</div>
                 </div>
               </div>
             )}

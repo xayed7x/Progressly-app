@@ -8,11 +8,7 @@ const __dirname = path.dirname(__filename);
 
 const withPWA = pwa({
   dest: "public",
-  // --- THIS IS THE CRITICAL CHANGE ---
-  // We are telling the service worker to NOT skip the 'waiting' phase.
-  // This gives our app time to show the "Update Available" prompt.
   skipWaiting: false,
-  // --- END CHANGE ---
   cacheOnFrontEndNav: true,
   aggressiveFrontEndNavCaching: true,
   reloadOnOnline: true,
