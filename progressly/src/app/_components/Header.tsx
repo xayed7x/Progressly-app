@@ -8,7 +8,7 @@ import {
 } from "@clerk/nextjs";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import PwaInstaller from "./PwaInstaller";
+import ResilientPwaButton from "./ResilientPwaButton";
 
 export default function Header() {
   return (
@@ -23,8 +23,12 @@ export default function Header() {
         />
 
         <div className="flex items-center gap-x-4">
+          {/* The PWA button is now a direct child of the main flex container,
+              so it will render immediately. */}
+          <ResilientPwaButton />
+          
           <ClerkLoaded>
-            {/* This part shows only when the user is logged OUT */}
+            {/* The Sign In/Up and UserButton remain inside ClerkLoaded */}
             <SignedOut>
               <SignInButton mode="modal">
                 <Button className="bg-accent1 text-primary hover:bg-accent1/90">
@@ -37,13 +41,8 @@ export default function Header() {
                 </Button>
               </SignUpButton>
             </SignedOut>
-
-            {/* This part shows only when the user is logged IN */}
             <SignedIn>
-              <div className="flex items-center gap-x-2">
-                <PwaInstaller />
-                <UserButton />
-              </div>
+              <UserButton />
             </SignedIn>
           </ClerkLoaded>
         </div>
