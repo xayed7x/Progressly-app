@@ -4,7 +4,7 @@
 import { useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { usePWAUpdate } from "@/hooks/usePWAUpdate"; // Corrected import path
+import { usePWAUpdate } from "@/hooks/usePWAUpdate";
 
 export default function PwaUpdater() {
   const { toast } = useToast();

@@ -6,6 +6,10 @@
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#000000",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "en",
+  "categories": ["productivity", "lifestyle"],
   "icons": [
     {
       "src": "/web-app-manifest-192x192.png",

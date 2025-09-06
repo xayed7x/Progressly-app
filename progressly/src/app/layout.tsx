@@ -4,6 +4,7 @@ import { inter, playfair_display, roboto_mono } from "./fonts";
 import "./globals.css";
 import Header from "./_components/Header";
 import PwaUpdater from "./_components/pwa/PwaUpdater";
+import PwaInstaller from "./_components/PwaInstaller";
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
@@ -12,7 +13,22 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   appleWebApp: {
     title: "Progressly",
+    capable: true,
+    statusBarStyle: "default",
   },
+  other: {
+    "mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-status-bar-style": "default",
+  },
+};
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: "#000000",
 };
 
 export default function RootLayout({
@@ -31,7 +47,8 @@ export default function RootLayout({
         {/* The provider now goes INSIDE the body */}
         <ClerkProvider>
           <div className="font-sans bg-primary text-textLight min-h-screen">
-                        <Header />
+            <Header />
+            <PwaInstaller />
             <PwaUpdater />
             {children}
           </div>

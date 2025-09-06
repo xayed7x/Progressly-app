@@ -46,9 +46,8 @@ export const usePWAUpdate = () => {
 
     wb.addEventListener("controlling", handleControlling);
 
-    // Register the service worker.
-    // This should be done after adding the event listeners.
-    wb.register();
+    // Don't register the service worker here - it's already registered by PwaInstaller
+    // wb.register();
 
     return () => {
       wb.removeEventListener("waiting", handleWaiting);
