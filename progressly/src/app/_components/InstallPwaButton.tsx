@@ -74,10 +74,10 @@ export default function InstallPwaButton() {
     setIsDialogOpen(false); // Close the custom dialog
   };
 
-  // Only show the button if the app is not already installed and there's a prompt
-  // (or if we can reasonably assume it's iOS where the prompt doesn't fire but it's installable)
+  // If there's no install prompt, and it's not iOS (where prompt doesn't fire), hide the button.
+  // This covers cases where PWA is already installed or not installable.
   if (!installPrompt && typeof navigator !== 'undefined' && !/iPad|iPhone|iPod/.test(navigator.userAgent)) {
-      if (typeof window !== 'undefined' && window.matchMedia('(display-mode: standalone)').matches) return null;
+    return null;
   }
 
   return (
@@ -95,7 +95,7 @@ export default function InstallPwaButton() {
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button onClick={handleNativePrompt} className="bg-accent text-accent-foreground">Install App</Button>
+          <Button onClick={handleNativePrompt} className="bg-accent text-accent-foreground hover:bg-accent">Install App</Button>
           <DialogClose asChild>
             <Button variant="outline">Cancel</Button>
           </DialogClose>
