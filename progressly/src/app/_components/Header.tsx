@@ -8,7 +8,7 @@ import {
 } from "@clerk/nextjs";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import InstallPwaButton from "./InstallPwaButton";
+import PwaInstaller from "./PwaInstaller";
 
 export default function Header() {
   return (
@@ -41,7 +41,7 @@ export default function Header() {
             {/* This part shows only when the user is logged IN */}
             <SignedIn>
               <div className="flex items-center gap-x-2">
-                <InstallPwaButton />
+                <PwaInstaller />
                 <UserButton />
               </div>
             </SignedIn>

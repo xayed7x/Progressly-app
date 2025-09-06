@@ -1,9 +1,16 @@
 "use client";
 
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
+import InstallPwaButton from "./InstallPwaButton";
 
 export default function PwaInstaller() {
+  const [mounted, setMounted] = useState(false);
+
   useEffect(() => {
+    // Set mounted to true after component mounts on client
+    setMounted(true);
+
+    // Service worker registration (keeping existing functionality)
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker
         .register("/sw.js")
@@ -16,5 +23,11 @@ export default function PwaInstaller() {
     }
   }, []);
 
-  return null; // This component doesn't render anything
+  // Don't render anything until mounted on client
+  if (!mounted) {
+    return null;
+  }
+
+  // Only render InstallPwaButton after client-side mount
+  return <InstallPwaButton />;
 }
