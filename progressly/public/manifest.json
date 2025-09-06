@@ -1,7 +1,7 @@
 {
-  "name": "Progressly - The Luxury Productivity App",
+  "name": "Progressly - Track Your 24 Hours & Achieve Your Goals",
   "short_name": "Progressly",
-  "description": "The luxury productivity app for tracking your daily activities and goals.",
+  "description": "Progressly helps achievers track their 24 hours, plan better, and progress toward their goals. The AI-powered productivity app for time tracking, daily planning, and progress monitoring.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#000000",
@@ -9,9 +9,52 @@
   "orientation": "portrait-primary",
   "scope": "/",
   "lang": "en",
-  "categories": ["productivity", "lifestyle", "utilities"],
+  "dir": "ltr",
+  "categories": ["productivity", "lifestyle", "utilities", "business"],
   "prefer_related_applications": false,
   "id": "/",
+  "screenshots": [
+    {
+      "src": "/screenshots/desktop-screenshot.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Progressly Dashboard on Desktop"
+    },
+    {
+      "src": "/screenshots/mobile-screenshot.png", 
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Progressly Mobile App"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "Quick access to your productivity dashboard",
+      "url": "/dashboard",
+      "icons": [
+        {
+          "src": "/icons/dashboard-96x96.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Add Activity",
+      "short_name": "Add Activity",
+      "description": "Quickly log a new activity",
+      "url": "/dashboard?action=add",
+      "icons": [
+        {
+          "src": "/icons/add-96x96.png", 
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ],
   "icons": [
     {
       "src": "/web-app-manifest-192x192.png",
@@ -21,9 +64,45 @@
     },
     {
       "src": "/web-app-manifest-512x512.png",
-      "sizes": "512x512",
+      "sizes": "512x512", 
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-72x72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png", 
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-384x384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }
