@@ -8,7 +8,7 @@ const __dirname = path.dirname(__filename);
 
 const withPWA = pwa({
   dest: "public",
-  disable: false, // Explicitly enable PWA in all environments
+  disable: process.env.NODE_ENV === 'development', // Disable PWA in development to prevent caching issues
   register: true, // Ensure service worker registration
   skipWaiting: false,
   cacheOnFrontEndNav: true,

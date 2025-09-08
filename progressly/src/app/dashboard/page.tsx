@@ -1,10 +1,6 @@
-import GoalManager from "./_components/GoalManager";
 import DashboardClientPage from "./DashboardClientPage";
+import GoalManager from "./_components/GoalManager";
 
-export default async function DashboardPage() {
-  return (
-    <DashboardClientPage
-      goalManager={<GoalManager />}
-    />
-  );
+export default function DashboardPage() {
+  return <DashboardClientPage goalManager={<GoalManager />} />;
 }
