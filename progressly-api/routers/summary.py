@@ -1,5 +1,6 @@
 # progressly-api/routers/summary.py
 
+import logging
 from datetime import date
 from typing import List
 from fastapi import APIRouter, Depends
@@ -70,5 +71,16 @@ def get_daily_summary(summary_date: date, db: DBSession, clerk_session: ClerkSes
         )
         for res in results
     ]
+
+    # Safety net: Check if total exceeds 24 hours (1440 minutes)
+    total_minutes = sum(item.total_duration_minutes for item in summary_data)
+    
+    if total_minutes > 1440:
+        logging.warning(f"Data for user {user_id} on {summary_date} exceeded 24 hours! Total: {total_minutes} minutes")
+        
+        # Normalize data proportionally to exactly 1440 minutes
+        normalization_factor = 1440 / total_minutes
+        for item in summary_data:
+            item.total_duration_minutes = round(item.total_duration_minutes * normalization_factor, 2)
 
     return summary_data

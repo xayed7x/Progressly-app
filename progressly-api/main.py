@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from database import engine, get_session
 
 # Import the models used in this file
-from models import Goal, GoalCreate, LoggedActivity, ActivityCreate, Category, ActivityReadWithCategory
+from models import Goal, GoalCreate, LoggedActivity, ActivityCreate, ActivityUpdate, Category, ActivityReadWithCategory
 
 # Import our routers
 from routers import categories, summary, jobs
@@ -135,16 +135,31 @@ def get_activities(
         all_activities, target_date, sleep_category_id
     )
     
-    # Filter activities based on wake-up boundaries
-    filtered_activities = []
-    for activity in all_activities:
-        activity_datetime = datetime.combine(activity.activity_date, activity.start_time)
-        
-        if start_boundary <= activity_datetime < end_boundary:
-            filtered_activities.append(activity)
+    # CRITICAL FIX: Use database-level timestamp comparison instead of Python filtering
+    # This ensures we capture activities that cross midnight boundaries correctly
+    from sqlalchemy import text
     
-    # Sort by activity date and start time
-    filtered_activities.sort(key=lambda x: (x.activity_date, x.start_time), reverse=True)
+    # Create the final query using full timestamp comparison
+    final_statement = text("""
+        SELECT * FROM loggedactivity 
+        WHERE user_id = :user_id 
+        AND (activity_date + start_time::time) >= :start_boundary 
+        AND (activity_date + start_time::time) < :end_boundary
+        ORDER BY activity_date DESC, start_time DESC
+    """)
+    
+    result = db.execute(final_statement, {
+        "user_id": user_id,
+        "start_boundary": start_boundary,
+        "end_boundary": end_boundary
+    })
+    
+    # Convert raw results back to LoggedActivity objects
+    filtered_activities = []
+    for row in result:
+        activity = db.get(LoggedActivity, row.id)
+        if activity:
+            filtered_activities.append(activity)
     
     # Build response with nested category data
     results = []
@@ -187,30 +202,39 @@ def find_wake_up_boundaries(activities, target_date, sleep_category_id):
         # No sleep category found, use default boundaries
         return start_boundary, end_boundary
     
-    # Find sleep activities that ended on target_date (wake-up on target_date)
+    # Find sleep activities using full timestamp comparison
     target_date_sleep = []
-    for activity in activities:
-        if (activity.category_id == sleep_category_id and 
-            activity.activity_date == target_date):
-            target_date_sleep.append(activity)
-    
-    # Find sleep activities that ended on target_date + 1 (wake-up on target_date + 1)
     next_date_sleep = []
     next_date = target_date + timedelta(days=1)
+    
     for activity in activities:
-        if (activity.category_id == sleep_category_id and 
-            activity.activity_date == next_date):
-            next_date_sleep.append(activity)
+        if activity.category_id == sleep_category_id:
+            # Create full timestamp for the activity's end time
+            activity_end_datetime = datetime.combine(activity.activity_date, activity.end_time)
+            
+            # Check if this sleep ended on target_date (between 00:00 and 23:59:59 of target_date)
+            target_start = datetime.combine(target_date, time(0, 0))
+            target_end = datetime.combine(target_date + timedelta(days=1), time(0, 0))
+            
+            if target_start <= activity_end_datetime < target_end:
+                target_date_sleep.append(activity)
+            
+            # Check if this sleep ended on target_date + 1
+            next_start = datetime.combine(next_date, time(0, 0))
+            next_end = datetime.combine(next_date + timedelta(days=1), time(0, 0))
+            
+            if next_start <= activity_end_datetime < next_end:
+                next_date_sleep.append(activity)
     
     # Find the longest sleep session that ended on target_date
     if target_date_sleep:
         longest_sleep = max(target_date_sleep, key=lambda x: calculate_duration(x.start_time, x.end_time))
-        start_boundary = datetime.combine(target_date, longest_sleep.end_time)
+        start_boundary = datetime.combine(longest_sleep.activity_date, longest_sleep.end_time)
     
     # Find the longest sleep session that ended on target_date + 1
     if next_date_sleep:
         longest_sleep = max(next_date_sleep, key=lambda x: calculate_duration(x.start_time, x.end_time))
-        end_boundary = datetime.combine(next_date, longest_sleep.end_time)
+        end_boundary = datetime.combine(longest_sleep.activity_date, longest_sleep.end_time)
     
     return start_boundary, end_boundary
 
@@ -255,3 +279,48 @@ def seed_default_categories(db: DBSession, clerk_session: ClerkSession):
     db.commit()
 
     return {"message": f"Successfully created {len(default_categories_data)} default categories."}
+
+
+# === Activity Update Endpoint ===
+@app.put("/api/activities/{activity_id}", response_model=ActivityReadWithCategory)
+def update_activity(
+    activity_id: int,
+    update_data: ActivityUpdate,
+    db: DBSession,
+    clerk_session: ClerkSession
+):
+    user_id = clerk_session.payload['sub']
+    
+    # Fetch the activity from database
+    activity = db.get(LoggedActivity, activity_id)
+    if not activity:
+        raise HTTPException(status_code=404, detail="Activity not found")
+    
+    # Verify ownership - critical security check
+    if activity.user_id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this activity")
+    
+    # Update the fields
+    activity.activity_name = update_data.activity_name
+    activity.start_time = update_data.start_time
+    activity.end_time = update_data.end_time
+    activity.category_id = update_data.category_id
+    
+    # Commit changes and refresh
+    db.add(activity)
+    db.commit()
+    db.refresh(activity)
+    
+    # Return updated activity with category data
+    category = db.get(Category, activity.category_id) if activity.category_id else None
+    
+    return ActivityReadWithCategory(
+        id=activity.id,
+        user_id=activity.user_id,
+        activity_date=activity.activity_date,
+        activity_name=activity.activity_name,
+        start_time=activity.start_time,
+        end_time=activity.end_time,
+        category_id=activity.category_id,
+        category=category
+    )

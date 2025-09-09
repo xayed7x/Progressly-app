@@ -85,3 +85,9 @@ class ActivityRead(LoggedActivityBase):
 
 class ActivityReadWithCategory(ActivityRead):
     category: Optional[CategoryRead] = None
+
+class ActivityUpdate(SQLModel):
+    activity_name: str
+    start_time: time
+    end_time: time
+    category_id: int
