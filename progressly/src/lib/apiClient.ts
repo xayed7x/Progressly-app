@@ -36,3 +36,39 @@ export async function getDailySummary(
 
   return response.json();
 }
+
+/**
+ * Updates an existing activity in the backend API.
+ *
+ * @param {number} activityId - The ID of the activity to update.
+ * @param {object} updateData - The data to update the activity with.
+ * @param {string} token - The authentication token.
+ * @returns {Promise<any>} - A promise that resolves to the updated activity data.
+ */
+export async function updateActivity(
+  activityId: number,
+  updateData: {
+    activity_name: string;
+    start_time: string;
+    end_time: string;
+    category_id: number;
+  },
+  token: string
+): Promise<any> {
+  const apiUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/activities/${activityId}`;
+
+  const response = await fetch(apiUrl, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(updateData),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to update activity");
+  }
+
+  return response.json();
+}

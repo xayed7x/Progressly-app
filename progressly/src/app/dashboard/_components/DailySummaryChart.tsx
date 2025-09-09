@@ -122,18 +122,40 @@ export function DailySummaryChart({ selectedDate }: DailySummaryChartProps) {
   if (isLoading) return <ChartSkeleton />;
   if (error) return <div className="text-red-500 p-4 text-center">Could not load summary data.</div>;
 
-  const getSummaryTitle = (date: Date) => {
-    if (isToday(date)) return "Today's Summary";
-    if (isYesterday(date)) return "Yesterday's Summary";
-    return `${format(date, "EEEE")}'s Summary`;
+  // Calculate total time logged
+  const calculateTotalTime = (summaryData: DailySummaryItem[]) => {
+    const totalMinutes = summaryData.reduce((sum, item) => sum + item.total_duration_minutes, 0);
+    return totalMinutes;
   };
+
+  // Format total minutes into human-readable string
+  const formatTotalTime = (totalMinutes: number) => {
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    
+    if (hours === 0) return `${minutes}m`;
+    if (minutes === 0) return `${hours}h`;
+    return `${hours}h ${minutes}m`;
+  };
+
+  const getSummaryTitle = (date: Date) => {
+    if (isToday(date)) return "Summary for Today";
+    if (isYesterday(date)) return "Summary for Yesterday";
+    return `Summary for ${format(date, "EEEE")}`;
+  };
+
+  const totalTimeLogged = calculateTotalTime(data);
+  const formattedTotalTime = formatTotalTime(totalTimeLogged);
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="font-sans">{getSummaryTitle(selectedDate)}</CardTitle>
         <CardDescription>
-          A breakdown of your logged activities.
+          {data.length > 0 
+            ? `A breakdown of the ${formattedTotalTime} you've logged.`
+            : "No activities logged for this day."
+          }
         </CardDescription>
       </CardHeader>
       <CardContent>

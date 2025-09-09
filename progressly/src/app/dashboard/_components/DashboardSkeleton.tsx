@@ -11,38 +11,38 @@ export function DashboardSkeleton() {
         <Skeleton className="h-9 w-80" />
 
         {/* Activity Logger Card */}
-        <Card className="bg-secondary text-textDark w-full max-w-lg">
-          <CardHeader>
-            <Skeleton className="h-8 w-48" />
-            <Skeleton className="h-4 w-64" />
+        <Card className="bg-secondary text-textDark w-full max-w-lg border-2 border-cyan-300">
+          <CardHeader className="bg-yellow-50">
+            <div className="h-8 w-48 bg-purple-300 rounded animate-pulse" />
+            <div className="h-4 w-64 bg-indigo-300 rounded animate-pulse" />
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 bg-lime-50">
             {/* Activity Name Input */}
             <div className="space-y-2">
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-10 w-full" />
+              <div className="h-4 w-24 bg-red-300 rounded animate-pulse" />
+              <div className="h-10 w-full bg-orange-300 rounded animate-pulse" />
             </div>
             
             {/* Time Inputs */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Skeleton className="h-4 w-20" />
-                <Skeleton className="h-10 w-full" />
+                <div className="h-4 w-20 bg-pink-300 rounded animate-pulse" />
+                <div className="h-10 w-full bg-blue-300 rounded animate-pulse" />
               </div>
               <div className="space-y-2">
-                <Skeleton className="h-4 w-20" />
-                <Skeleton className="h-10 w-full" />
+                <div className="h-4 w-20 bg-teal-300 rounded animate-pulse" />
+                <div className="h-10 w-full bg-emerald-300 rounded animate-pulse" />
               </div>
             </div>
             
             {/* Category Select */}
             <div className="space-y-2">
-              <Skeleton className="h-4 w-16" />
-              <Skeleton className="h-10 w-full" />
+              <div className="h-4 w-16 bg-violet-300 rounded animate-pulse" />
+              <div className="h-10 w-full bg-rose-300 rounded animate-pulse" />
             </div>
           </CardContent>
-          <div className="p-6 pt-0">
-            <Skeleton className="h-10 w-full" />
+          <div className="p-6 pt-0 bg-amber-50">
+            <div className="h-10 w-full bg-slate-400 rounded animate-pulse" />
           </div>
         </Card>
 
@@ -61,16 +61,19 @@ export function DashboardSkeleton() {
 
         {/* Today's Log Section */}
         <div className="w-full max-w-lg bg-secondary/40 p-4 rounded-lg">
-          <Skeleton className="h-8 w-32 mb-4 mx-auto" />
+          <div className="h-8 w-32 mb-4 mx-auto bg-purple-300 rounded animate-pulse" />
           <div className="space-y-3">
             {/* Activity Cards */}
             {Array.from({ length: 3 }).map((_, i) => (
-              <Card key={i} className="bg-secondary/90">
-                <div className="grid grid-cols-[1fr_90px_auto_auto] items-center gap-4 p-3">
-                  <Skeleton className="h-5 w-32" />
-                  <Skeleton className="h-6 w-16 mx-auto" />
-                  <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-4 w-4" />
+              <Card key={i} className="bg-secondary/90 border border-orange-300">
+                <div className="p-4 bg-pink-50">
+                  <div className="flex flex-col gap-2">
+                    <div className="h-4 w-3/4 bg-red-300 rounded animate-pulse" />
+                    <div className="flex justify-between items-center">
+                      <div className="h-3 w-24 bg-blue-300 rounded animate-pulse" />
+                      <div className="h-6 w-16 bg-green-300 rounded animate-pulse" />
+                    </div>
+                  </div>
                 </div>
               </Card>
             ))}

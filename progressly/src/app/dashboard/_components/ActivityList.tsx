@@ -3,9 +3,10 @@ import type { ActivityReadWithCategory } from "@/lib/types";
 
 type ActivityListProps = {
   activities: ActivityReadWithCategory[];
+  onActivityUpdated: () => void;
 };
 
-export default function ActivityList({ activities }: ActivityListProps) {
+export default function ActivityList({ activities, onActivityUpdated }: ActivityListProps) {
   if (!activities || activities.length === 0) {
     return null;
   }
@@ -21,7 +22,12 @@ export default function ActivityList({ activities }: ActivityListProps) {
         <div className="absolute left-6 top-0 h-full w-0.5 bg-muted" />
 
         {chronologicalActivities.map((activity, index) => (
-          <ActivityCard key={activity.id} activity={activity} index={index} />
+          <ActivityCard 
+            key={activity.id} 
+            activity={activity} 
+            index={index} 
+            onActivityUpdated={onActivityUpdated}
+          />
         ))}
       </div>
     </div>

@@ -118,6 +118,7 @@ export default function DashboardClientPage({
             activities={activities}
             isLoading={isLoadingActivities}
             selectedDate={selectedDate}
+            onActivityUpdated={mutateActivities}
           />
         </div>
 

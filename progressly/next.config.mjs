@@ -25,7 +25,7 @@ const withPWA = pwa({
       options: {
         cacheName: "pages-cache",
         cacheableResponse: {
-          statuses: [200],
+          statuses: [200, 307, 308], // Add 307 and 308 to allow caching of redirects
         },
       },
     },

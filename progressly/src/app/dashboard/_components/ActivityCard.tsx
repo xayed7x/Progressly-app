@@ -1,6 +1,10 @@
 import { ActivityReadWithCategory } from "@/lib/types";
 import { format, parse } from "date-fns";
-import { Badge } from "@/components/ui/badge"; // We are bringing the Badge back!
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Pencil } from "lucide-react";
+import { useState } from "react";
+import { EditActivityDialog } from "./EditActivityDialog";
 
 // A predefined, tasteful color palette for the card backgrounds.
 const cardColorPalette = [
@@ -25,10 +29,13 @@ const formatTime = (timeStr: string | undefined) => {
 export default function ActivityCard({
   activity,
   index, // We now accept an 'index' to calculate the background color
+  onActivityUpdated, // SWR mutate function for instant UI refresh
 }: {
   activity: ActivityReadWithCategory;
   index: number;
+  onActivityUpdated: () => void;
 }) {
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   // --- COLOR LOGIC ---
   // The card background cycles through our predefined palette.
   const cardBackgroundColor = cardColorPalette[index % cardColorPalette.length];
@@ -57,15 +64,32 @@ export default function ActivityCard({
             <span className="text-sm text-white/70">
               {formatTime(activity.start_time)} - {formatTime(activity.end_time)}
             </span>
-            <Badge
-              style={{ backgroundColor: categoryColor, color: "#FFFFFF" }}
-              className="max-w-[150px] truncate"
-            >
-              {activity.category?.name || "Other"}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge
+                style={{ backgroundColor: categoryColor, color: "#FFFFFF" }}
+                className="max-w-[120px] truncate"
+              >
+                {activity.category?.name || "Other"}
+              </Badge>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 w-6 p-0 text-white/70 hover:text-white hover:bg-white/10"
+                onClick={() => setIsEditDialogOpen(true)}
+              >
+                <Pencil className="h-3 w-3" />
+              </Button>
+            </div>
           </div>
         </div>
       </div>
+      
+      <EditActivityDialog
+        activity={activity}
+        isOpen={isEditDialogOpen}
+        onClose={() => setIsEditDialogOpen(false)}
+        onActivityUpdated={onActivityUpdated}
+      />
     </div>
   );
 }
