@@ -11,6 +11,7 @@ import { format, isToday, isYesterday } from "date-fns";
 
 interface ActivitiesWrapperProps {
   activities: ActivityReadWithCategory[] | undefined;
+  optimisticActivities: ActivityReadWithCategory[];
   isLoading: boolean;
   selectedDate: Date;
   onActivityUpdated: () => void;
@@ -18,6 +19,7 @@ interface ActivitiesWrapperProps {
 
 export function ActivitiesWrapper({
   activities,
+  optimisticActivities,
   isLoading,
   selectedDate,
   onActivityUpdated,
@@ -28,7 +30,10 @@ export function ActivitiesWrapper({
 
   // CRITICAL FIX: Don't filter by activity_date since backend now handles wake-up to wake-up logic
   // The backend already returns the correct activities for the selected date's wake-up cycle
-  const allActivities = activities || [];
+  const apiActivities = activities || [];
+  
+  // Merge API activities with optimistic activities
+  const allActivities = [...optimisticActivities, ...apiActivities];
 
   // Sort activities in reverse chronological order (newest first)
   const sortedActivities = [...allActivities].sort((a, b) => {

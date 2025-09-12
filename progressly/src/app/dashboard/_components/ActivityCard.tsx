@@ -2,7 +2,7 @@ import { ActivityReadWithCategory } from "@/lib/types";
 import { format, parse } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Pencil } from "lucide-react";
+import { Pencil, CloudOff } from "lucide-react";
 import { useState } from "react";
 import { EditActivityDialog } from "./EditActivityDialog";
 
@@ -30,10 +30,12 @@ export default function ActivityCard({
   activity,
   index, // We now accept an 'index' to calculate the background color
   onActivityUpdated, // SWR mutate function for instant UI refresh
+  isPendingSync = false, // New prop for offline activities
 }: {
   activity: ActivityReadWithCategory;
   index: number;
   onActivityUpdated: () => void;
+  isPendingSync?: boolean;
 }) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   // --- COLOR LOGIC ---
@@ -61,9 +63,16 @@ export default function ActivityCard({
 
           {/* Tier 2 & 3: Time Span and Category Badge on one line */}
           <div className="flex justify-between items-center">
-            <span className="text-sm text-white/70">
-              {formatTime(activity.start_time)} - {formatTime(activity.end_time)}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-white/70">
+                {formatTime(activity.start_time)} - {formatTime(activity.end_time)}
+              </span>
+              {isPendingSync && (
+                <div title="Pending sync">
+                  <CloudOff className="h-4 w-4 text-orange-400" />
+                </div>
+              )}
+            </div>
             <div className="flex items-center gap-2">
               <Badge
                 style={{ backgroundColor: categoryColor, color: "#FFFFFF" }}

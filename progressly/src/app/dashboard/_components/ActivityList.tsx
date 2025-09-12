@@ -27,6 +27,7 @@ export default function ActivityList({ activities, onActivityUpdated }: Activity
             activity={activity} 
             index={index} 
             onActivityUpdated={onActivityUpdated}
+            isPendingSync={(activity as any).isPendingSync || false}
           />
         ))}
       </div>

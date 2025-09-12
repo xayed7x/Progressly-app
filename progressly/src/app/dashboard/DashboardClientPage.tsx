@@ -1,6 +1,7 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { storeAuthToken } from "@/lib/token-manager";
+import { Suspense, useState, useEffect } from "react";
 import { useUser, useAuth } from "@clerk/nextjs";
 import useSWR from "swr";
 import { isToday, subDays } from "date-fns";
@@ -9,7 +10,6 @@ import ActivityLogger from "./_components/ActivityLogger";
 import { ActivitiesWrapper } from "./_components/ActivitiesWrapper";
 import { DailySummaryChart, ChartSkeleton } from "./_components/DailySummaryChart";
 import { DaySelector } from "./_components/DaySelector";
-import { DashboardSkeleton } from "./_components/DashboardSkeleton";
 
 import { Category, ActivityReadWithCategory } from "@/lib/types";
 
@@ -23,6 +23,21 @@ export default function DashboardClientPage({
   const { user } = useUser();
   const { getToken } = useAuth();
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [optimisticActivities, setOptimisticActivities] = useState<ActivityReadWithCategory[]>([]);
+
+  useEffect(() => {
+    const storeToken = async () => {
+        const token = await getToken({ template: "fastapi" });
+        if(token) {
+            await storeAuthToken(token);
+        }
+    };
+
+    storeToken(); // Store token on initial load
+    const intervalId = setInterval(storeToken, 10 * 60 * 1000); // Store token every 10 minutes
+
+    return () => clearInterval(intervalId);
+  }, [getToken]);
 
   const fetcher = async (url: string) => {
     const token = await getToken({ template: "fastapi" });
@@ -74,6 +89,11 @@ export default function DashboardClientPage({
   const isNextDisabled = isToday(selectedDate);
   const isPreviousDisabled = selectedDate <= dayBeforeYesterday;
 
+  // Add optimistic activity function
+  const addOptimisticActivity = (activity: ActivityReadWithCategory) => {
+    setOptimisticActivities(prev => [activity, ...prev]);
+  };
+
   // Navigation handlers
   const handleGoToPreviousDay = () => {
     if (!isPreviousDisabled) {
@@ -87,10 +107,6 @@ export default function DashboardClientPage({
     }
   };
 
-  // Show skeleton while initial data is loading
-  if (isLoadingActivities) {
-    return <DashboardSkeleton />;
-  }
 
   return (
     <main className="container mx-auto px-4 py-8">
@@ -103,6 +119,7 @@ export default function DashboardClientPage({
           categories={categories ?? []}
           lastEndTime={lastEndTime}
           onActivityLogged={mutateActivities}
+          addOptimisticActivity={addOptimisticActivity}
         />
 
         <DaySelector
@@ -116,6 +133,7 @@ export default function DashboardClientPage({
         <div className="w-full max-w-lg bg-secondary/40 p-4 rounded-lg">
           <ActivitiesWrapper
             activities={activities}
+            optimisticActivities={optimisticActivities}
             isLoading={isLoadingActivities}
             selectedDate={selectedDate}
             onActivityUpdated={mutateActivities}

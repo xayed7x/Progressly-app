@@ -11,6 +11,7 @@ const withPWA = pwa({
   disable: process.env.NODE_ENV === 'development', // Disable PWA in development to prevent caching issues
   register: true, // Ensure service worker registration
   skipWaiting: false,
+  customWorkerDir: "src/app",
   cacheOnFrontEndNav: true,
   aggressiveFrontEndNavCaching: true,
   reloadOnOnline: true,

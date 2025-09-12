@@ -5,6 +5,8 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
+import { useAuth } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils"; // Make sure you have this Shadcn utility
 
 const scenes = [
@@ -36,6 +38,17 @@ const scenes = [
 
 export default function HomePage() {
   const [activeIndex, setActiveIndex] = useState(0);
+  const { isSignedIn, isLoaded } = useAuth();
+  const router = useRouter();
+
+  // Client-side authentication check and redirect
+  useEffect(() => {
+    if (isLoaded) {
+      if (isSignedIn) {
+        router.replace('/dashboard');
+      }
+    }
+  }, [isLoaded, isSignedIn, router]);
 
   const callback = () => {
     setActiveIndex((prevIndex) => (prevIndex + 1) % scenes.length);
