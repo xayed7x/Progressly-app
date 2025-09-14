@@ -97,7 +97,7 @@ def get_activities(
 ):
     """
     Get activities using wake-up to wake-up day cycle logic.
-    If target_date is provided, returns activities from wake-up on target_date to wake-up on target_date+1.
+    Returns activities from wake-up on target_date to wake-up on target_date+1.
     If no target_date provided, defaults to today.
     """
     user_id = clerk_session.payload['sub']
@@ -106,7 +106,7 @@ def get_activities(
     if target_date is None:
         target_date = date.today()
     
-    # First, fetch a 4-day window of data to ensure we have enough context
+    # Fetch a 4-day window of data to ensure we have enough context
     # This includes the day before target_date to catch sleep that started the previous day
     data_start = target_date - timedelta(days=1)
     data_end = target_date + timedelta(days=2)
@@ -117,11 +117,12 @@ def get_activities(
         .where(LoggedActivity.user_id == user_id)
         .where(func.date(LoggedActivity.activity_date) >= data_start)
         .where(func.date(LoggedActivity.activity_date) <= data_end)
+        .order_by(LoggedActivity.activity_date.desc(), LoggedActivity.start_time.desc())
     )
     
     all_activities = db.exec(base_statement).all()
     
-    # Find the user's Sleep category ID
+    # Find the user's Sleep category
     sleep_category = db.exec(
         select(Category)
         .where(Category.user_id == user_id)
@@ -130,36 +131,33 @@ def get_activities(
     
     sleep_category_id = sleep_category.id if sleep_category else None
     
-    # Implement wake-up to wake-up algorithm
+    # Get the wake-up boundaries for the target date
     start_boundary, end_boundary = find_wake_up_boundaries(
         all_activities, target_date, sleep_category_id
     )
     
-    # CRITICAL FIX: Use database-level timestamp comparison instead of Python filtering
-    # This ensures we capture activities that cross midnight boundaries correctly
-    from sqlalchemy import text
-    
-    # Create the final query using full timestamp comparison
-    final_statement = text("""
-        SELECT * FROM loggedactivity 
-        WHERE user_id = :user_id 
-        AND (activity_date + start_time::time) >= :start_boundary 
-        AND (activity_date + start_time::time) < :end_boundary
-        ORDER BY activity_date DESC, start_time DESC
-    """)
-    
-    result = db.execute(final_statement, {
-        "user_id": user_id,
-        "start_boundary": start_boundary,
-        "end_boundary": end_boundary
-    })
-    
-    # Convert raw results back to LoggedActivity objects
+    # Filter activities that fall within the wake-up boundaries
     filtered_activities = []
-    for row in result:
-        activity = db.get(LoggedActivity, row.id)
-        if activity:
+    for activity in all_activities:
+        # Create datetime objects for comparison
+        activity_start = datetime.combine(activity.activity_date, activity.start_time)
+        
+        # Handle activities that cross midnight
+        activity_end = datetime.combine(
+            activity.activity_date + timedelta(days=1) if activity.end_time < activity.start_time 
+            else activity.activity_date, 
+            activity.end_time
+        )
+        
+        # Check if activity overlaps with the target day's wake-up boundaries
+        if activity_start < end_boundary and activity_end > start_boundary:
             filtered_activities.append(activity)
+    
+    # Sort activities by start time in descending order
+    filtered_activities.sort(
+        key=lambda x: (x.activity_date, x.start_time), 
+        reverse=True
+    )
     
     # Build response with nested category data
     results = []
@@ -198,43 +196,50 @@ def find_wake_up_boundaries(activities, target_date, sleep_category_id):
     start_boundary = datetime.combine(target_date, time(0, 0))
     end_boundary = datetime.combine(target_date + timedelta(days=1), time(0, 0))
     
-    if not sleep_category_id:
-        # No sleep category found, use default boundaries
+    if not sleep_category_id or not activities:
+        # No sleep category found or no activities, use default boundaries
         return start_boundary, end_boundary
     
     # Find sleep activities using full timestamp comparison
-    target_date_sleep = []
-    next_date_sleep = []
-    next_date = target_date + timedelta(days=1)
+    previous_day_sleeps = []
+    current_day_sleeps = []
+    
+    # Get the previous day's date
+    previous_date = target_date - timedelta(days=1)
     
     for activity in activities:
-        if activity.category_id == sleep_category_id:
-            # Create full timestamp for the activity's end time
-            activity_end_datetime = datetime.combine(activity.activity_date, activity.end_time)
+        if activity.category_id != sleep_category_id:
+            continue
             
-            # Check if this sleep ended on target_date (between 00:00 and 23:59:59 of target_date)
-            target_start = datetime.combine(target_date, time(0, 0))
-            target_end = datetime.combine(target_date + timedelta(days=1), time(0, 0))
-            
-            if target_start <= activity_end_datetime < target_end:
-                target_date_sleep.append(activity)
-            
-            # Check if this sleep ended on target_date + 1
-            next_start = datetime.combine(next_date, time(0, 0))
-            next_end = datetime.combine(next_date + timedelta(days=1), time(0, 0))
-            
-            if next_start <= activity_end_datetime < next_end:
-                next_date_sleep.append(activity)
+        # Create full timestamp for the activity's start and end times
+        activity_start = datetime.combine(activity.activity_date, activity.start_time)
+        activity_end = datetime.combine(
+            activity.activity_date + timedelta(days=1) if activity.end_time < activity.start_time 
+            else activity.activity_date, 
+            activity.end_time
+        )
+        
+        # Check if this sleep started on the previous day and ended on target_date
+        if activity_start.date() == previous_date and activity_end.date() == target_date:
+            previous_day_sleeps.append((activity_start, activity_end, activity))
+        
+        # Check if this sleep starts on target_date and ends the next day
+        elif activity_start.date() == target_date and activity_end.date() == (target_date + timedelta(days=1)):
+            current_day_sleeps.append((activity_start, activity_end, activity))
     
-    # Find the longest sleep session that ended on target_date
-    if target_date_sleep:
-        longest_sleep = max(target_date_sleep, key=lambda x: calculate_duration(x.start_time, x.end_time))
-        start_boundary = datetime.combine(longest_sleep.activity_date, longest_sleep.end_time)
+    # Find the latest wake-up time from the previous night's sleep
+    if previous_day_sleeps:
+        # Sort by end time descending to get the latest wake-up
+        previous_day_sleeps.sort(key=lambda x: x[1], reverse=True)
+        latest_wake_up = previous_day_sleeps[0][1]
+        start_boundary = latest_wake_up
     
-    # Find the longest sleep session that ended on target_date + 1
-    if next_date_sleep:
-        longest_sleep = max(next_date_sleep, key=lambda x: calculate_duration(x.start_time, x.end_time))
-        end_boundary = datetime.combine(longest_sleep.activity_date, longest_sleep.end_time)
+    # Find the next night's sleep end time (wake-up time for the next day)
+    if current_day_sleeps:
+        # Sort by end time descending to get the latest wake-up
+        current_day_sleeps.sort(key=lambda x: x[1], reverse=True)
+        next_wake_up = current_day_sleeps[0][1]
+        end_boundary = next_wake_up
     
     return start_boundary, end_boundary
 
