@@ -63,6 +63,10 @@ app.include_router(jobs.router)
 @app.get("/")
 def read_root(): return {"message": "Welcome to the Progressly API!"}
 
+@app.head("/", include_in_schema=False)
+def read_root_head():
+    return
+
 @app.get("/api/health", status_code=200)
 def health_check():
     """
