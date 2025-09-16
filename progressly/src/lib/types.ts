@@ -28,3 +28,17 @@ export type DailySummaryItem = {
   category_color: string;
   total_duration_minutes: number;
 };
+
+export interface PieChartData {
+  id: number;
+  name: string;
+  duration: number;
+  color: string;
+}
+
+export interface DashboardBootstrapData {
+  activities_last_3_days: ActivityReadWithCategory[];
+  pie_chart_data: PieChartData[];
+  last_end_time: string | null;
+  categories: Category[];
+}

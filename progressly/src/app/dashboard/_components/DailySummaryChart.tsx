@@ -1,9 +1,7 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useAuth } from "@clerk/nextjs";
-import { format, isToday, isYesterday } from "date-fns";
-import useSWR from "swr";
+import { useState } from 'react';
+import { format, isToday, isYesterday } from 'date-fns';
 import {
   BarChart,
   Bar,
@@ -11,13 +9,11 @@ import {
   Pie,
   XAxis,
   YAxis,
-  CartesianGrid,
   Tooltip,
   ResponsiveContainer,
   Cell,
-} from "recharts";
-import { getDailySummary } from "@/lib/apiClient";
-import { DailySummaryItem } from "@/lib/types";
+} from 'recharts';
+import { PieChartData } from '@/lib/types';
 
 // Shadcn UI components
 import {
@@ -26,26 +22,26 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Skeleton } from "@/components/ui/skeleton";
+} from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
 
 // --- Custom Components for the Chart ---
 
 const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
-    const hours = Math.floor(data.total_duration_minutes / 60);
-    const minutes = Math.round(data.total_duration_minutes % 60);
+    const hours = Math.floor(data.duration / 60);
+    const minutes = Math.round(data.duration % 60);
     const timeString =
-      `${hours > 0 ? `${hours}h` : ""} ${
-        minutes > 0 ? `${minutes}m` : ""
-      }`.trim() || "0m";
+      `${hours > 0 ? `${hours}h` : ''} ${
+        minutes > 0 ? `${minutes}m` : ''
+      }`.trim() || '0m';
 
     return (
       <div className="p-2 text-sm bg-primary/90 backdrop-blur-sm border border-white/20 rounded-md shadow-lg text-secondary">
-        <p className="font-bold" style={{ color: data.category_color }}>
-          {data.category_name}
+        <p className="font-bold" style={{ color: data.color }}>
+          {data.name}
         </p>
         <p className="text-muted-foreground">{`Total: ${timeString}`}</p>
       </div>
@@ -55,18 +51,15 @@ const CustomTooltip = ({ active, payload }: any) => {
 };
 
 // A clean, custom legend that works for both charts
-const CustomLegend = ({ data }: { data: DailySummaryItem[] }) => (
+const CustomLegend = ({ data }: { data: PieChartData[] }) => (
   <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 mt-4 text-sm text-secondary">
     {data.map((entry) => (
-      <div
-        key={`legend-${entry.category_id}`}
-        className="flex items-center gap-2"
-      >
+      <div key={`legend-${entry.id}`} className="flex items-center gap-2">
         <div
           className="w-3 h-3 rounded-sm"
-          style={{ backgroundColor: entry.category_color }}
+          style={{ backgroundColor: entry.color }}
         />
-        <span>{entry.category_name}</span>
+        <span>{entry.name}</span>
       </div>
     ))}
   </div>
@@ -88,43 +81,15 @@ export const ChartSkeleton = () => (
 
 interface DailySummaryChartProps {
   selectedDate: Date;
+  data: PieChartData[];
 }
 
-export function DailySummaryChart({ selectedDate }: DailySummaryChartProps) {
-  const { getToken } = useAuth();
-  const [activeTab, setActiveTab] = useState("pie"); // New state for active tab
-
-  // Create a fetcher function for useSWR
-  const fetcher = async (url: string) => {
-    const token = await getToken();
-    if (!token) {
-      throw new Error("User is not authenticated.");
-    }
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) {
-      throw new Error("Failed to fetch data");
-    }
-    return res.json();
-  };
-
-  // Format the date for the API call
-  const dateString = selectedDate.toISOString().split("T")[0];
-  const apiUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/summary/daily/${dateString}`;
-
-  // Use useSWR with single string key that changes when selectedDate changes
-  const { data = [], error, isLoading } = useSWR<DailySummaryItem[]>(
-    apiUrl,
-    fetcher
-  );
-
-  if (isLoading) return <ChartSkeleton />;
-  if (error) return <div className="text-red-500 p-4 text-center">Could not load summary data.</div>;
+export function DailySummaryChart({ selectedDate, data }: DailySummaryChartProps) {
+  const [activeTab, setActiveTab] = useState('pie');
 
   // Calculate total time logged
-  const calculateTotalTime = (summaryData: DailySummaryItem[]) => {
-    const totalMinutes = summaryData.reduce((sum, item) => sum + item.total_duration_minutes, 0);
+  const calculateTotalTime = (summaryData: PieChartData[]) => {
+    const totalMinutes = summaryData.reduce((sum, item) => sum + item.duration, 0);
     return totalMinutes;
   };
 
@@ -132,16 +97,16 @@ export function DailySummaryChart({ selectedDate }: DailySummaryChartProps) {
   const formatTotalTime = (totalMinutes: number) => {
     const hours = Math.floor(totalMinutes / 60);
     const minutes = totalMinutes % 60;
-    
+
     if (hours === 0) return `${minutes}m`;
     if (minutes === 0) return `${hours}h`;
     return `${hours}h ${minutes}m`;
   };
 
   const getSummaryTitle = (date: Date) => {
-    if (isToday(date)) return "Summary for Today";
-    if (isYesterday(date)) return "Summary for Yesterday";
-    return `Summary for ${format(date, "EEEE")}`;
+    if (isToday(date)) return 'Summary for Today';
+    if (isYesterday(date)) return 'Summary for Yesterday';
+    return `Summary for ${format(date, 'EEEE')}`;
   };
 
   const totalTimeLogged = calculateTotalTime(data);
@@ -152,24 +117,46 @@ export function DailySummaryChart({ selectedDate }: DailySummaryChartProps) {
       <CardHeader>
         <CardTitle className="font-sans">{getSummaryTitle(selectedDate)}</CardTitle>
         <CardDescription>
-          {data.length > 0 
+          {data.length > 0
             ? `A breakdown of the ${formattedTotalTime} you've logged.`
-            : "No activities logged for this day."
-          }
+            : 'No activities logged for this day.'}
         </CardDescription>
       </CardHeader>
       <CardContent>
         {data.length === 0 ? (
           <div className="flex items-center justify-center h-[350px]">
             <p className="text-muted-foreground">
-              No activities logged for today.
+              No activities logged for this day.
             </p>
           </div>
         ) : (
-          <Tabs defaultValue="pie" value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <Tabs
+            defaultValue="pie"
+            value={activeTab}
+            onValueChange={setActiveTab}
+            className="w-full"
+          >
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="pie" className={activeTab === "pie" ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground"}>Pie Chart</TabsTrigger>
-              <TabsTrigger value="bar" className={activeTab === "bar" ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground"}>Bar Chart</TabsTrigger>
+              <TabsTrigger
+                value="pie"
+                className={
+                  activeTab === 'pie'
+                    ? 'bg-accent text-accent-foreground'
+                    : 'bg-muted text-muted-foreground'
+                }
+              >
+                Pie Chart
+              </TabsTrigger>
+              <TabsTrigger
+                value="bar"
+                className={
+                  activeTab === 'bar'
+                    ? 'bg-accent text-accent-foreground'
+                    : 'bg-muted text-muted-foreground'
+                }
+              >
+                Bar Chart
+              </TabsTrigger>
             </TabsList>
 
             {/* Pie Chart View */}
@@ -179,17 +166,14 @@ export function DailySummaryChart({ selectedDate }: DailySummaryChartProps) {
                   <Tooltip content={<CustomTooltip />} />
                   <Pie
                     data={data}
-                    dataKey="total_duration_minutes"
-                    nameKey="category_name"
+                    dataKey="duration"
+                    nameKey="name"
                     cx="50%"
                     cy="50%"
                     outerRadius={120}
                   >
                     {data.map((entry) => (
-                      <Cell
-                        key={`cell-${entry.category_id}`}
-                        fill={entry.category_color}
-                      />
+                      <Cell key={`cell-${entry.id}`} fill={entry.color} />
                     ))}
                   </Pie>
                 </PieChart>
@@ -204,10 +188,8 @@ export function DailySummaryChart({ selectedDate }: DailySummaryChartProps) {
                   data={data}
                   margin={{ top: 5, right: 20, left: -10, bottom: 5 }}
                 >
-                  
-                  {/* FIX: Use a theme-aware color for axis text */}
                   <XAxis
-                    dataKey="category_name"
+                    dataKey="name"
                     stroke="hsl(var(--muted-foreground))"
                     fontSize={12}
                     tickLine={false}
@@ -222,14 +204,11 @@ export function DailySummaryChart({ selectedDate }: DailySummaryChartProps) {
                   />
                   <Tooltip
                     content={<CustomTooltip />}
-                    cursor={{ fill: "hsl(var(--muted)/0.3)" }}
+                    cursor={{ fill: 'hsl(var(--muted)/0.3)' }}
                   />
-                  <Bar dataKey="total_duration_minutes" radius={[4, 4, 0, 0]}>
+                  <Bar dataKey="duration" radius={[4, 4, 0, 0]}>
                     {data.map((entry) => (
-                      <Cell
-                        key={`cell-${entry.category_id}`}
-                        fill={entry.category_color}
-                      />
+                      <Cell key={`cell-${entry.id}`} fill={entry.color} />
                     ))}
                   </Bar>
                 </BarChart>

@@ -1,19 +1,43 @@
-"use client";
+'use client';
 
-import { storeAuthToken } from "@/lib/token-manager";
-import { Suspense, useState, useEffect } from "react";
-import { useUser, useAuth } from "@clerk/nextjs";
-import useSWR from "swr";
-import { isToday, subDays } from "date-fns";
+import { storeAuthToken } from '@/lib/token-manager';
+import { Suspense, useState, useEffect, useMemo } from 'react';
+import { useUser, useAuth } from '@clerk/nextjs';
+import useSWR from 'swr';
+import { isToday, subDays, parseISO } from 'date-fns';
 
-import ActivityLogger from "./_components/ActivityLogger";
-import { ActivitiesWrapper } from "./_components/ActivitiesWrapper";
-import { DailySummaryChart, ChartSkeleton } from "./_components/DailySummaryChart";
-import { DaySelector } from "./_components/DaySelector";
+import ActivityLogger from './_components/ActivityLogger';
+import { ActivitiesWrapper } from './_components/ActivitiesWrapper';
+import {
+  DailySummaryChart,
+  ChartSkeleton,
+} from './_components/DailySummaryChart';
+import { DaySelector } from './_components/DaySelector';
 
-import { Category, ActivityReadWithCategory } from "@/lib/types";
+import {
+  Category,
+  ActivityReadWithCategory,
+  DashboardBootstrapData,
+  PieChartData,
+} from '@/lib/types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:8000';
+
+// Helper function to calculate duration of an activity in minutes
+function calculateDuration(startTime: string, endTime: string): number {
+  const start = new Date(`1970-01-01T${startTime}`);
+  const end = new Date(`1970-01-01T${endTime}`);
+
+  if (end < start) {
+    // Handle overnight activities
+    const midnight = new Date('1970-01-02T00:00:00');
+    const duration = (midnight.getTime() - start.getTime() + (end.getTime() - new Date('1970-01-01T00:00:00').getTime())) / (1000 * 60);
+    return duration;
+  } else {
+    return (end.getTime() - start.getTime()) / (1000 * 60);
+  }
+}
 
 export default function DashboardClientPage({
   goalManager,
@@ -23,14 +47,16 @@ export default function DashboardClientPage({
   const { user } = useUser();
   const { getToken } = useAuth();
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [optimisticActivities, setOptimisticActivities] = useState<ActivityReadWithCategory[]>([]);
+  const [optimisticActivities, setOptimisticActivities] = useState<
+    ActivityReadWithCategory[]
+  >([]);
 
   useEffect(() => {
     const storeToken = async () => {
-        const token = await getToken({ template: "fastapi" });
-        if(token) {
-            await storeAuthToken(token);
-        }
+      const token = await getToken({ template: 'fastapi' });
+      if (token) {
+        await storeAuthToken(token);
+      }
     };
 
     storeToken(); // Store token on initial load
@@ -40,58 +66,80 @@ export default function DashboardClientPage({
   }, [getToken]);
 
   const fetcher = async (url: string) => {
-    const token = await getToken({ template: "fastapi" });
+    const token = await getToken({ template: 'fastapi' });
     if (!token) {
-      throw new Error("User is not authenticated.");
+      throw new Error('User is not authenticated.');
     }
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) {
-      throw new Error("Failed to fetch data");
+      throw new Error('Failed to fetch data');
     }
     return res.json();
   };
 
   const { 
-    data: activities,
-    isLoading: isLoadingActivities,
-    mutate: mutateActivities,
-  } = useSWR<ActivityReadWithCategory[]>(
-    `${API_BASE_URL}/api/activities?target_date=${selectedDate.toISOString().split('T')[0]}`,
+    data: bootstrapData,
+    isLoading: isLoadingBootstrap,
+    mutate: mutateBootstrap,
+  } = useSWR<DashboardBootstrapData>(
+    `${API_BASE_URL}/api/dashboard-bootstrap`,
     fetcher
   );
 
-  const { data: categories } = useSWR<Category[]>(
-    `${API_BASE_URL}/api/categories`,
-    fetcher
-  );
-
-  let lastEndTime: string | undefined = undefined;
-  if (activities && activities.length > 0) {
-    // Find the activity with the latest end_time
-    const latestActivity = activities.reduce((prev, current) => {
-      const prevEndTime = new Date(`2000-01-01T${prev.end_time}`); // Use a dummy date for time comparison
-      const currentEndTime = new Date(`2000-01-01T${current.end_time}`);
-      return currentEndTime > prevEndTime ? current : prev;
+  // Memoize filtered activities for the selected date
+  const activitiesForSelectedDate = useMemo(() => {
+    if (!bootstrapData) return [];
+    return bootstrapData.activities_last_3_days.filter(act => {
+      // Important: Compare dates without time component
+      const activityDate = parseISO(act.activity_date).toDateString();
+      return activityDate === selectedDate.toDateString();
     });
+  }, [bootstrapData, selectedDate]);
 
-    // Format the latest end_time to "HH:mm"
-    const latestEndHour = new Date(`2000-01-01T${latestActivity.end_time}`).getHours();
-    const latestEndMinute = new Date(`2000-01-01T${latestActivity.end_time}`).getMinutes();
-    lastEndTime = `${String(latestEndHour).padStart(2, '0')}:${String(latestEndMinute).padStart(2, '0')}`;
-  }
+  // Memoize pie chart data calculation
+  const pieChartDataForSelectedDate = useMemo((): PieChartData[] => {
+    if (!bootstrapData) return [];
+
+    // Use pre-calculated data for today for efficiency
+    if (isToday(selectedDate)) {
+      return bootstrapData.pie_chart_data;
+    }
+
+    // Otherwise, calculate from the activities for the selected date
+    const categoryDurations: { [key: string]: PieChartData } = {};
+
+    for (const activity of activitiesForSelectedDate) {
+      if (activity.category) {
+        const duration = calculateDuration(activity.start_time, activity.end_time);
+        if (categoryDurations[activity.category.id]) {
+          categoryDurations[activity.category.id].duration += duration;
+        } else {
+          categoryDurations[activity.category.id] = {
+            id: parseInt(activity.category.id, 10),
+            name: activity.category.name,
+            color: activity.category.color,
+            duration: duration,
+          };
+        }
+      }
+    }
+    return Object.values(categoryDurations);
+  }, [bootstrapData, selectedDate, activitiesForSelectedDate]);
 
   // Calculate disabled states for navigation
   const today = new Date();
   const dayBeforeYesterday = subDays(today, 2);
-  
+
   const isNextDisabled = isToday(selectedDate);
-  const isPreviousDisabled = selectedDate <= dayBeforeYesterday;
+  const isPreviousDisabled = selectedDate.toDateString() === dayBeforeYesterday.toDateString();
 
   // Add optimistic activity function
   const addOptimisticActivity = (activity: ActivityReadWithCategory) => {
-    setOptimisticActivities(prev => [activity, ...prev]);
+    setOptimisticActivities((prev) => [activity, ...prev]);
+    // Optionally, you could also update the bootstrap data optimistically
+    // mutateBootstrap( ... );
   };
 
   // Navigation handlers
@@ -107,18 +155,17 @@ export default function DashboardClientPage({
     }
   };
 
-
   return (
     <main className="container mx-auto px-4 py-8">
       <div className="flex flex-col items-center justify-center gap-y-8">
         <h1 className="text-center text-3xl font-bold text-secondary">
-          Welcome back, {user?.firstName || "Achiever"}!
+          Welcome back, {user?.firstName || 'Achiever'}!
         </h1>
 
         <ActivityLogger
-          categories={categories ?? []}
-          lastEndTime={lastEndTime}
-          onActivityLogged={mutateActivities}
+          categories={bootstrapData?.categories ?? []}
+          lastEndTime={bootstrapData?.last_end_time?.substring(0, 5) ?? undefined}
+          onActivityLogged={mutateBootstrap}
           addOptimisticActivity={addOptimisticActivity}
         />
 
@@ -132,18 +179,23 @@ export default function DashboardClientPage({
 
         <div className="w-full max-w-lg bg-secondary/40 p-4 rounded-lg">
           <ActivitiesWrapper
-            activities={activities}
+            activities={activitiesForSelectedDate}
             optimisticActivities={optimisticActivities}
-            isLoading={isLoadingActivities}
+            isLoading={isLoadingBootstrap}
             selectedDate={selectedDate}
-            onActivityUpdated={mutateActivities}
+            onActivityUpdated={mutateBootstrap}
           />
         </div>
 
-        <div className="mt-12">
-          <Suspense fallback={<ChartSkeleton />}>
-            <DailySummaryChart selectedDate={selectedDate} />
-          </Suspense>
+        <div className="mt-12 w-full max-w-2xl">
+          {isLoadingBootstrap ? (
+            <ChartSkeleton />
+          ) : (
+            <DailySummaryChart
+              selectedDate={selectedDate}
+              data={pieChartDataForSelectedDate}
+            />
+          )}
         </div>
 
         {/* Goal Manager section - hidden for now
@@ -155,3 +207,4 @@ export default function DashboardClientPage({
     </main>
   );
 }
+

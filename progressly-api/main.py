@@ -22,6 +22,20 @@ from routers import categories, summary, jobs
 from dependencies import DBSession, ClerkSession
 
 
+# --- NEW RESPONSE MODELS ---
+class PieChartData(SQLModel):
+    id: int
+    name: str
+    duration: int
+    color: str
+
+class DashboardBootstrapResponse(SQLModel):
+    activities_last_3_days: list[ActivityReadWithCategory]
+    pie_chart_data: list[PieChartData]
+    last_end_time: Optional[time]
+    categories: list[Category]
+
+
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
 
@@ -260,6 +274,88 @@ def calculate_duration(start_time, end_time):
     else:
         # Same-day activity
         return (end_time.hour * 60 + end_time.minute) - (start_time.hour * 60 + start_time.minute)
+
+# === Dashboard Bootstrap Endpoint ===
+@app.get("/api/dashboard-bootstrap", response_model=DashboardBootstrapResponse)
+def get_dashboard_bootstrap(db: DBSession, clerk_session: ClerkSession):
+    user_id = clerk_session.payload['sub']
+    today = date.today()
+    three_days_ago = today - timedelta(days=2)
+
+    # 1. Fetch Activities from the last 3 days
+    activities_statement = (
+        select(LoggedActivity)
+        .where(LoggedActivity.user_id == user_id)
+        .where(LoggedActivity.activity_date >= three_days_ago)
+        .order_by(LoggedActivity.activity_date.desc(), LoggedActivity.start_time.desc())
+    )
+    activities_last_3_days_raw = db.exec(activities_statement).all()
+
+    activities_last_3_days = []
+    for a in activities_last_3_days_raw:
+        category_obj = None
+        if a.category_rel:
+            category_obj = {
+                "id": a.category_rel.id,
+                "name": a.category_rel.name,
+                "color": a.category_rel.color,
+                "is_default": a.category_rel.is_default,
+            }
+        activities_last_3_days.append(
+            ActivityReadWithCategory(
+                id=a.id,
+                activity_name=a.activity_name,
+                start_time=a.start_time,
+                end_time=a.end_time,
+                activity_date=a.activity_date,
+                user_id=a.user_id,
+                category_id=a.category_id,
+                category=category_obj,
+            )
+        )
+
+    # 2. Aggregate Pie Chart Data for today
+    today_activities_statement = (
+        select(LoggedActivity)
+        .where(LoggedActivity.user_id == user_id)
+        .where(LoggedActivity.activity_date == today)
+    )
+    today_activities = db.exec(today_activities_statement).all()
+
+    user_categories_statement = select(Category).where(Category.user_id == user_id)
+    user_categories = db.exec(user_categories_statement).all()
+    category_map = {cat.id: cat for cat in user_categories}
+
+    category_durations = {}
+    for act in today_activities:
+        duration = calculate_duration(act.start_time, act.end_time)
+        if act.category_id and act.category_id in category_map:
+            category = category_map[act.category_id]
+            if category.id not in category_durations:
+                category_durations[category.id] = {"duration": 0, "name": category.name, "color": category.color}
+            category_durations[category.id]["duration"] += duration
+
+    pie_chart_data = [
+        PieChartData(id=cat_id, name=data["name"], duration=data["duration"], color=data["color"])
+        for cat_id, data in category_durations.items()
+    ]
+
+    # 3. Fetch Last End Time
+    latest_activity_statement = (
+        select(LoggedActivity)
+        .where(LoggedActivity.user_id == user_id)
+        .order_by(LoggedActivity.activity_date.desc(), LoggedActivity.start_time.desc())
+        .limit(1)
+    )
+    latest_activity = db.exec(latest_activity_statement).first()
+    last_end_time = latest_activity.end_time if latest_activity else None
+
+    return DashboardBootstrapResponse(
+        activities_last_3_days=activities_last_3_days,
+        pie_chart_data=pie_chart_data,
+        last_end_time=last_end_time,
+        categories=user_categories,
+    )
 
 # === Seed Endpoint ===
 @app.post("/api/users/seed-defaults", status_code=201)
