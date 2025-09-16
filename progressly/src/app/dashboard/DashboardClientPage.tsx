@@ -102,30 +102,34 @@ export default function DashboardClientPage({
   const pieChartDataForSelectedDate = useMemo((): PieChartData[] => {
     if (!bootstrapData) return [];
 
+    let data: PieChartData[];
+
     // Use pre-calculated data for today for efficiency
     if (isToday(selectedDate)) {
-      return bootstrapData.pie_chart_data;
-    }
+      data = bootstrapData.pie_chart_data;
+    } else {
+      // Otherwise, calculate from the activities for the selected date
+      const categoryDurations: { [key: string]: PieChartData } = {};
 
-    // Otherwise, calculate from the activities for the selected date
-    const categoryDurations: { [key: string]: PieChartData } = {};
-
-    for (const activity of activitiesForSelectedDate) {
-      if (activity.category) {
-        const duration = calculateDuration(activity.start_time, activity.end_time);
-        if (categoryDurations[activity.category.id]) {
-          categoryDurations[activity.category.id].duration += duration;
-        } else {
-          categoryDurations[activity.category.id] = {
-            id: parseInt(activity.category.id, 10),
-            name: activity.category.name,
-            color: activity.category.color,
-            duration: duration,
-          };
+      for (const activity of activitiesForSelectedDate) {
+        if (activity.category) {
+          const duration = calculateDuration(activity.start_time, activity.end_time);
+          if (categoryDurations[activity.category.id]) {
+            categoryDurations[activity.category.id].duration += duration;
+          } else {
+            categoryDurations[activity.category.id] = {
+              id: parseInt(activity.category.id, 10),
+              name: activity.category.name,
+              color: activity.category.color,
+              duration: duration,
+            };
+          }
         }
       }
+      data = Object.values(categoryDurations);
     }
-    return Object.values(categoryDurations);
+    // Sort data by duration in descending order
+    return data.sort((a, b) => b.duration - a.duration);
   }, [bootstrapData, selectedDate, activitiesForSelectedDate]);
 
   // Calculate disabled states for navigation

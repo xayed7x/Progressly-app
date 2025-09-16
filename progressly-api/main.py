@@ -139,7 +139,7 @@ def get_activities(
         .where(LoggedActivity.user_id == user_id)
         .where(func.date(LoggedActivity.activity_date) >= data_start)
         .where(func.date(LoggedActivity.activity_date) <= data_end)
-        .order_by(LoggedActivity.activity_date.desc(), LoggedActivity.start_time.desc())
+        .order_by(LoggedActivity.activity_date.asc(), LoggedActivity.start_time.asc())
     )
     
     all_activities = db.exec(base_statement).all()
@@ -175,11 +175,7 @@ def get_activities(
         if activity_start < end_boundary and activity_end > start_boundary:
             filtered_activities.append(activity)
     
-    # Sort activities by start time in descending order
-    filtered_activities.sort(
-        key=lambda x: (x.activity_date, x.start_time), 
-        reverse=True
-    )
+    # The database query already sorts the activities, so no need to sort again.
     
     # Build response with nested category data
     results = []
@@ -287,7 +283,7 @@ def get_dashboard_bootstrap(db: DBSession, clerk_session: ClerkSession):
         select(LoggedActivity)
         .where(LoggedActivity.user_id == user_id)
         .where(LoggedActivity.activity_date >= three_days_ago)
-        .order_by(LoggedActivity.activity_date.desc(), LoggedActivity.start_time.desc())
+        .order_by(LoggedActivity.activity_date.asc(), LoggedActivity.start_time.asc())
     )
     activities_last_3_days_raw = db.exec(activities_statement).all()
 
@@ -335,10 +331,13 @@ def get_dashboard_bootstrap(db: DBSession, clerk_session: ClerkSession):
                 category_durations[category.id] = {"duration": 0, "name": category.name, "color": category.color}
             category_durations[category.id]["duration"] += duration
 
-    pie_chart_data = [
+    pie_chart_data_unsorted = [
         PieChartData(id=cat_id, name=data["name"], duration=data["duration"], color=data["color"])
         for cat_id, data in category_durations.items()
     ]
+
+    # Sort the pie chart data by duration in descending order
+    pie_chart_data = sorted(pie_chart_data_unsorted, key=lambda x: x.duration, reverse=True)
 
     # 3. Fetch Last End Time
     latest_activity_statement = (

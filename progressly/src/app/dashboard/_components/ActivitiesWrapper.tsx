@@ -35,14 +35,14 @@ export function ActivitiesWrapper({
   // Merge API activities with optimistic activities
   const allActivities = [...optimisticActivities, ...apiActivities];
 
-  // Sort activities in reverse chronological order (newest first)
+  // Sort activities in chronological order (oldest first)
   const sortedActivities = [...allActivities].sort((a, b) => {
     // Create full, comparable timestamps for each activity
     const timestamp_a = new Date(a.activity_date.split('T')[0] + 'T' + a.start_time);
     const timestamp_b = new Date(b.activity_date.split('T')[0] + 'T' + b.start_time);
     
-    // Sort in descending order (newest first)
-    return timestamp_b.getTime() - timestamp_a.getTime();
+    // Sort in ascending order (oldest first)
+    return timestamp_a.getTime() - timestamp_b.getTime();
   });
 
   const getLogTitle = (date: Date) => {

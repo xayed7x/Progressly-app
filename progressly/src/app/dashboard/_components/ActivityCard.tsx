@@ -6,15 +6,6 @@ import { Pencil, CloudOff } from "lucide-react";
 import { useState } from "react";
 import { EditActivityDialog } from "./EditActivityDialog";
 
-// A predefined, tasteful color palette for the card backgrounds.
-const cardColorPalette = [
-  "#2D3748", // Slate Gray
-  "#4A5568", // Darker Gray
-  "#2B6CB0", // Cool Blue
-  "#2C5282", // Darker Blue
-  "#38A169", // Muted Green
-];
-
 const formatTime = (timeStr: string | undefined) => {
   if (!timeStr) return "N/A";
   try {
@@ -39,10 +30,9 @@ export default function ActivityCard({
 }) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   // --- COLOR LOGIC ---
-  // The card background cycles through our predefined palette.
-  const cardBackgroundColor = cardColorPalette[index % cardColorPalette.length];
-  // The timeline dot and category badge use the actual color from the database.
-  const categoryColor = activity.category?.color || "#A0AEC0"; // Fallback to a light gray
+  // The card background and category badge use the actual color from the database.
+  const categoryColor = activity.category?.color || "#4A5568"; // Fallback to Dark Gray for better contrast
+  const cardBackgroundColor = categoryColor;
 
   return (
     // Root container for timeline structure

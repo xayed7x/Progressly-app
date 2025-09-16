@@ -11,8 +11,8 @@ export default function ActivityList({ activities, onActivityUpdated }: Activity
     return null;
   }
 
-  // Create chronological order (morning to night)
-  const chronologicalActivities = [...activities].reverse();
+  // Activities are already sorted by the parent component.
+  const chronologicalActivities = activities;
 
   return (
     <div className="w-full max-w-lg">
