@@ -71,6 +71,14 @@ def health_check():
     """
     return {"status": "ok"}
 
+@app.head("/api/health", status_code=200, include_in_schema=False)
+def health_check_head():
+    """
+    A simple endpoint to verify that the API is running for HEAD requests.
+    Used by external services to keep the instance alive.
+    """
+    return
+
 # The endpoint definitions below are now cleaner as they use the imported dependencies
 @app.post("/api/goals", response_model=Goal)
 def create_goal(goal_data: GoalCreate, db: DBSession, clerk_session: ClerkSession):
