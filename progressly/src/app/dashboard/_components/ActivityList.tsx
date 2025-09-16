@@ -34,5 +34,3 @@ export default function ActivityList({ activities, onActivityUpdated }: Activity
     </div>
   );
 }
-
-

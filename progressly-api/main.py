@@ -49,6 +49,14 @@ app.include_router(jobs.router)
 @app.get("/")
 def read_root(): return {"message": "Welcome to the Progressly API!"}
 
+@app.get("/api/health", status_code=200)
+def health_check():
+    """
+    A simple endpoint to verify that the API is running.
+    Used by external services to keep the instance alive.
+    """
+    return {"status": "ok"}
+
 # The endpoint definitions below are now cleaner as they use the imported dependencies
 @app.post("/api/goals", response_model=Goal)
 def create_goal(goal_data: GoalCreate, db: DBSession, clerk_session: ClerkSession):
