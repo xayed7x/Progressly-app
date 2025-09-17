@@ -142,7 +142,7 @@ export function EditActivityDialog({
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" disabled={isSubmitting} variant="default" className="bg-accent">
               {isSubmitting ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>
