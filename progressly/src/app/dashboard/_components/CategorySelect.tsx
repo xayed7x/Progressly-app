@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import {
   Select,
@@ -14,6 +14,7 @@ import CreateCategoryDialog from "./CreateCategoryDialog";
 import { useState } from "react";
 import { defaultActivityCategories, defaultCategoryHexColors } from "@/lib/constants";
 import { createCategory } from "../category-actions";
+import { CATEGORY_CONFIG } from "@/lib/category-config"; // Import config
 
 interface CategorySelectProps {
   name: string;
@@ -27,13 +28,22 @@ export default function CategorySelect({
   defaultValue,
 }: CategorySelectProps) {
   const [value, setValue] = useState<string | undefined>(defaultValue);
-  
-  // Helper function to get category color from constants or fallback to category.color
+
+  // Helper function to get category color
   const getCategoryColor = (category: Category) => {
     return defaultCategoryHexColors[category.name] || category.color;
   };
+
+  // Helper function to get category icon
+  const getCategoryIcon = (categoryName: string) => {
+    const config =
+      categoryName && categoryName in CATEGORY_CONFIG
+        ? CATEGORY_CONFIG[categoryName as keyof typeof CATEGORY_CONFIG]
+        : CATEGORY_CONFIG["Default"];
+    return config.icon;
+  };
+
   const handleValueChange = async (newValue: string) => {
-    // If user picked a recommended default (not yet in DB), create it on-the-fly
     const prefix = "__default__:";
     if (newValue.startsWith(prefix)) {
       const presetName = newValue.substring(prefix.length);
@@ -45,7 +55,6 @@ export default function CategorySelect({
         setValue(String(result.data.id));
         return;
       }
-      // fallback: keep select unchanged if creation failed
       return;
     }
     setValue(newValue);
@@ -57,48 +66,48 @@ export default function CategorySelect({
         <SelectValue placeholder="Select a category" />
       </SelectTrigger>
       <SelectContent>
-        {/* Scrollable List: Wrap the category items in a scrollable container */}
         <div className="max-h-[240px] overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-accent1 scrollbar-track-secondary/50">
-          {/* Map over the categories passed from the server */}
-          {categories.map((category) => (
-            <SelectItem
-              key={category.id}
-              // CRITICAL: The value sent to the form is now the category ID
-              value={category.id.toString()}
-            >
-              <div className="flex items-center gap-2">
-                <span
-                  className="w-3 h-3 rounded-full"
-                  style={{ backgroundColor: getCategoryColor(category) }}
-                />
-                {category.name}
-              </div>
-            </SelectItem>
-          ))}
+          {categories.map((category) => {
+            const Icon = getCategoryIcon(category.name);
+            return (
+              <SelectItem
+                key={category.id}
+                value={category.id.toString()}
+              >
+                <div className="flex items-center gap-2">
+                  <Icon
+                    className="w-4 h-4"
+                    style={{ color: getCategoryColor(category) }}
+                  />
+                  {category.name}
+                </div>
+              </SelectItem>
+            );
+          })}
 
-          {/* Fallback: recommended defaults if user has no categories yet */}
           {categories.length === 0 && (
             <>
               <SelectSeparator />
-              {defaultActivityCategories.map((label: string) => (
-                <SelectItem key={label} value={`__default__:${label}`}>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: defaultCategoryHexColors[label] || "#808080" }}
-                    />
-                    {label}
-                  </div>
-                </SelectItem>
-              ))}
+              {defaultActivityCategories.map((label: string) => {
+                const Icon = getCategoryIcon(label);
+                return (
+                  <SelectItem key={label} value={`__default__:${label}`}>
+                    <div className="flex items-center gap-2">
+                      <Icon
+                        className="w-4 h-4"
+                        style={{ color: defaultCategoryHexColors[label] || "#808080" }}
+                      />
+                      {label}
+                    </div>
+                  </SelectItem>
+                );
+              })}
             </>
           )}
         </div>
 
-        {/* Visual Separation */}
         <SelectSeparator />
 
-        {/* Sticky Button: The "Create New Category" button, always visible */}
         <CreateCategoryDialog
           onCreated={(cat) => {
             setValue(String(cat.id));

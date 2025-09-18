@@ -20,6 +20,7 @@ import {
   DashboardBootstrapData,
   PieChartData,
 } from '@/lib/types';
+import { defaultActivityCategories } from '@/lib/constants';
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:8000';
@@ -87,6 +88,33 @@ export default function DashboardClientPage({
     `${API_BASE_URL}/api/dashboard-bootstrap`,
     fetcher
   );
+
+  const sortedCategories = useMemo(() => {
+    if (!bootstrapData?.categories) return [];
+
+    const categories = bootstrapData.categories;
+    const template = defaultActivityCategories;
+
+    const defaultCats: Category[] = [];
+    const customCats: Category[] = [];
+
+    // Separate default and custom categories
+    for (const category of categories) {
+      if (template.includes(category.name)) {
+        defaultCats.push(category);
+      } else {
+        customCats.push(category);
+      }
+    }
+
+    // Sort default categories based on the template order
+    defaultCats.sort((a, b) => template.indexOf(a.name) - template.indexOf(b.name));
+
+    // Sort custom categories alphabetically
+    customCats.sort((a, b) => a.name.localeCompare(b.name));
+
+    return [...defaultCats, ...customCats];
+  }, [bootstrapData]);
 
   // Memoize filtered activities for the selected date
   const activitiesForSelectedDate = useMemo(() => {
@@ -167,7 +195,7 @@ export default function DashboardClientPage({
         </h1>
 
         <ActivityLogger
-          categories={bootstrapData?.categories ?? []}
+          categories={sortedCategories}
           lastEndTime={bootstrapData?.last_end_time?.substring(0, 5) ?? undefined}
           onActivityLogged={mutateBootstrap}
           addOptimisticActivity={addOptimisticActivity}

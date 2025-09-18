@@ -3,17 +3,17 @@
 export const defaultActivityCategories = [
   "Work",
   "Study",
-  "Skill Development",
   "Spiritual & Faith",
+  "Eating & Nutrition",
+  "Skill Development",
+  "Social Media",
+  "Family & Social",
   "Health & Fitness",
   "Personal Time",
-  "Family & Social",
-  "Social Media",
-  "Leisure & Hobbies",
-  "Eating & Nutrition",
+  "Sleep",
   "Transportation",
   "Home & Chores",
-  "Sleep",
+  "Leisure & Hobbies",
 ];
 
 export const categoryStyles: { [key: string]: string } = {
@@ -43,9 +43,7 @@ export const defaultCategoryHexColors: { [key: string]: string } = {
   "Personal Time": "#8b5cf6",
   "Family & Social": "#eab308",
   "Social Media": "#ec4899",
-  "Leisure & Hobbies": "#06b6d4",
-  "Eating & Nutrition": "#f97316",
-  Transportation: "#64748b",
+  
   "Home & Chores": "#78716c",
   Sleep: "#4f46e5",
 };

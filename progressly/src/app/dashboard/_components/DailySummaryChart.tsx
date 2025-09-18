@@ -14,6 +14,7 @@ import {
   Cell,
 } from 'recharts';
 import { PieChartData } from '@/lib/types';
+import { CATEGORY_CONFIG } from '@/lib/category-config';
 
 // Shadcn UI components
 import {
@@ -64,6 +65,33 @@ const CustomLegend = ({ data }: { data: PieChartData[] }) => (
     ))}
   </div>
 );
+
+const CustomXAxisTick = (props: any) => {
+  const { x, y, payload } = props;
+  const categoryName = payload.value;
+
+  const getCategoryIcon = (name: string) => {
+    const trimmedName = name ? name.trim() : '';
+    const config = CATEGORY_CONFIG[trimmedName as keyof typeof CATEGORY_CONFIG];
+    if (config && config.icon) {
+      return config.icon;
+    }
+    // Always return a valid icon component
+    return CATEGORY_CONFIG["Default"].icon;
+  };
+
+  const Icon = getCategoryIcon(categoryName);
+
+  return (
+    <g transform={`translate(${x},${y})`}>
+        <foreignObject x={-12} y={0} width={24} height={24}>
+            <div style={{ color: 'hsl(var(--muted-foreground))', textAlign: 'center' }}>
+                <Icon className="w-4 h-4 inline-block" />
+            </div>
+        </foreignObject>
+    </g>
+  );
+};
 
 export const ChartSkeleton = () => (
   <Card>
@@ -194,6 +222,7 @@ export function DailySummaryChart({ selectedDate, data }: DailySummaryChartProps
                     fontSize={12}
                     tickLine={false}
                     axisLine={false}
+                    tick={<CustomXAxisTick />}
                   />
                   <YAxis
                     stroke="hsl(var(--muted-foreground))"
