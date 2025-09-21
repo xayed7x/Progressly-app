@@ -75,6 +75,7 @@ class ActivityCreate(SQLModel):
     start_time: time
     end_time: time
     category_id: Optional[int] = None
+    target_date: str # New field for client-provided date
 
 # NEW: API Read models to handle sending nested category data to the frontend.
 class ActivityRead(LoggedActivityBase):

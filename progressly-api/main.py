@@ -104,13 +104,9 @@ def get_goals(db: DBSession, clerk_session: ClerkSession):
 @app.post("/api/activities", response_model=LoggedActivity)
 def create_activity(activity_data: ActivityCreate, db: DBSession, clerk_session: ClerkSession):
     user_id = clerk_session.payload['sub']
-    activity_dict = activity_data.model_dump()
-    today_date = datetime.utcnow().date()
-    
-    if activity_data.end_time < activity_data.start_time:
-        date_to_save = today_date - timedelta(days=1)
-    else:
-        date_to_save = today_date
+    activity_dict = activity_data.model_dump(exclude={'target_date'})
+    # Parse the date string from the client
+    date_to_save = datetime.fromisoformat(activity_data.target_date).date()
 
     new_activity = LoggedActivity(
         **activity_dict,

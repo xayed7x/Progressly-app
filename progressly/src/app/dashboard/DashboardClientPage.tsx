@@ -4,7 +4,7 @@ import { storeAuthToken } from '@/lib/token-manager';
 import { Suspense, useState, useEffect, useMemo } from 'react';
 import { useUser, useAuth } from '@clerk/nextjs';
 import useSWR from 'swr';
-import { isToday, subDays, parseISO } from 'date-fns';
+import { isToday, subDays, parseISO, addDays } from 'date-fns';
 
 import ActivityLogger from './_components/ActivityLogger';
 import { ActivitiesWrapper } from './_components/ActivitiesWrapper';
@@ -187,6 +187,19 @@ export default function DashboardClientPage({
     }
   };
 
+  // New handler for when an activity is logged
+  const handleActivityLogged = (newActivity: ActivityReadWithCategory) => {
+    mutateBootstrap(); // Revalidate data
+
+    // Check if the logged activity is 'Sleep'
+    if (newActivity.category?.name === 'Sleep') {
+      // Advance the date to the day after the sleep activity
+      const sleepDate = parseISO(newActivity.activity_date);
+      const nextDay = addDays(sleepDate, 1);
+      setSelectedDate(nextDay);
+    }
+  };
+
   return (
     <main className="container mx-auto px-4 py-8">
       <div className="flex flex-col items-center justify-center gap-y-8">
@@ -197,8 +210,9 @@ export default function DashboardClientPage({
         <ActivityLogger
           categories={sortedCategories}
           lastEndTime={bootstrapData?.last_end_time?.substring(0, 5) ?? undefined}
-          onActivityLogged={mutateBootstrap}
+          onActivityLogged={handleActivityLogged} // Use the new handler
           addOptimisticActivity={addOptimisticActivity}
+          selectedDate={selectedDate} // Pass down selectedDate
         />
 
         <DaySelector

@@ -5,7 +5,10 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 
-export async function logActivity(formData: FormData) {
+export async function logActivity(
+  formData: FormData,
+  target_date: string // Add target_date parameter
+) {
   const { getToken } = await auth();
   const token = await getToken({ template: "fastapi" });
 
@@ -21,6 +24,7 @@ export async function logActivity(formData: FormData) {
     category_id: formData.get("category_id")
       ? Number(formData.get("category_id"))
       : null,
+    target_date: target_date, // Include target_date in the payload
   };
 
   // Basic validation

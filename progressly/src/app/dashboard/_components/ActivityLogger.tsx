@@ -12,36 +12,50 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { logActivity } from "@/app/dashboard/activity-actions";
 import { useRef, useState } from "react";
-import { Category } from "@/lib/types";
+import { Category, ActivityReadWithCategory } from "@/lib/types";
 import CategorySelect from "./CategorySelect";
 import SubmitButton from "./SubmitButton";
 import AnimatedPlaceholderInput from "./AnimatedPlaceholderInput";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { db, QueuedActivity } from "@/lib/db";
+import { subDays, formatISO } from "date-fns";
 
 export default function ActivityLogger({
   lastEndTime,
   categories,
   onActivityLogged,
   addOptimisticActivity,
+  selectedDate,
 }: {
   lastEndTime?: string;
   categories: Category[];
-  onActivityLogged: () => void;
+  onActivityLogged: (newActivity: ActivityReadWithCategory) => void; // Expect a new activity
   addOptimisticActivity: (activity: any) => void;
+  selectedDate: Date; // Receive selectedDate from parent
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const [activityName, setActivityName] = useState("");
   const isOnline = useOnlineStatus();
 
   const handleFormSubmit = async (formData: FormData) => {
+    const startTime = formData.get("start_time") as string;
+    const endTime = formData.get("end_time") as string;
+
+    // Determine the target date for the activity
+    let dateForActivity = selectedDate;
+    if (endTime < startTime) {
+      // If end time is on the next day, the activity belongs to the previous day
+      dateForActivity = subDays(selectedDate, 1);
+    }
+    const target_date = formatISO(dateForActivity, { representation: "date" });
+
     try {
       if (isOnline) {
         // Online: Send to backend API
-        const result = await logActivity(formData);
-        if (result.success) {
+        const result = await logActivity(formData, target_date);
+        if (result.success && result.data) {
           setActivityName(""); // Clear the activity name input
-          onActivityLogged(); // Revalidate the activities list
+          onActivityLogged(result.data); // Pass the new activity to the callback
         } else {
           // Handle error display
           alert(result.error);
@@ -50,22 +64,20 @@ export default function ActivityLogger({
         // Offline: Save to IndexedDB
         const queuedActivity: QueuedActivity = {
           activity_name: formData.get("activity_name") as string,
-          start_time: formData.get("start_time") as string,
-          end_time: formData.get("end_time") as string,
+          start_time: startTime,
+          end_time: endTime,
           category_id: formData.get("category_id") ? Number(formData.get("category_id")) : null,
         };
 
         await db.queued_activities.add(queuedActivity);
 
-        // After successfully queueing, register a background sync.
         if (navigator.serviceWorker && "SyncManager" in window) {
           const sw = await navigator.serviceWorker.ready;
           await sw.sync.register("sync-queued-activities");
         }
         
-        // Create optimistic activity object for immediate UI display
         const optimisticActivity = {
-          id: Date.now(), // Temporary ID
+          id: Date.now(),
           activity_name: queuedActivity.activity_name,
           start_time: queuedActivity.start_time,
           end_time: queuedActivity.end_time,
@@ -74,12 +86,11 @@ export default function ActivityLogger({
           category: queuedActivity.category_id 
             ? categories.find(cat => cat.id.toString() === queuedActivity.category_id!.toString()) || null
             : null,
-          isPendingSync: true, // Mark as pending sync
+          isPendingSync: true,
         };
 
         addOptimisticActivity(optimisticActivity);
-        setActivityName(""); // Clear the activity name input
-        // Note: We don't call onActivityLogged() here since the data is only queued locally
+        setActivityName("");
       }
     } catch (error) {
       console.error("Error submitting activity:", error);
