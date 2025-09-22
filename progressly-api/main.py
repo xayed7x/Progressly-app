@@ -364,37 +364,8 @@ def get_dashboard_bootstrap(db: DBSession, clerk_session: ClerkSession):
         categories=user_categories,
     )
 
-# === Seed Endpoint ===
-@app.post("/api/users/seed-defaults", status_code=201)
-def seed_default_categories(db: DBSession, clerk_session: ClerkSession):
-    user_id = clerk_session.payload['sub']
 
-    existing_defaults = db.exec(
-        select(Category).where(Category.user_id == user_id, Category.is_default == True)
-    ).first()
 
-    if existing_defaults:
-        return {"message": "Default categories already exist for this user."}
-
-    default_categories_data = [
-        {"name": "Work", "color": "#3b82f6"}, {"name": "Study", "color": "#22c55e"},
-        {"name": "Skill Development", "color": "#14b8a6"}, {"name": "Spiritual & Faith", "color": "#f59e0b"},
-        {"name": "Health & Fitness", "color": "#ef4444"}, {"name": "Personal Time", "color": "#8b5cf6"},
-        {"name": "Family & Social", "color": "#eab308"}, {"name": "Social Media", "color": "#ec4899"},
-        {"name": "Leisure & Hobbies", "color": "#06b6d4"}, {"name": "Eating & Nutrition", "color": "#f97316"},
-        {"name": "Transportation", "color": "#64748b"}, {"name": "Home & Chores", "color": "#78716c"},
-        {"name": "Sleep", "color": "#4f46e5"},
-    ]
-
-    for cat_data in default_categories_data:
-        new_category = Category(
-            name=cat_data["name"], color=cat_data["color"], user_id=user_id, is_default=True
-        )
-        db.add(new_category)
-    
-    db.commit()
-
-    return {"message": f"Successfully created {len(default_categories_data)} default categories."}
 
 
 # === Activity Update Endpoint ===

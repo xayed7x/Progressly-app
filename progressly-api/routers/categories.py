@@ -40,35 +40,83 @@ router = APIRouter(
 
 @router.get("", response_model=List[CategoryRead])
 def get_user_categories(db: DBSession, clerk_session: ClerkSession):
-    # Get the User ID from the authenticated Clerk session
     user_id = clerk_session.payload['sub']
-    
-    # Check for Existing Defaults: Query to check if any categories exist for this user_id where is_default=True
-    existing_defaults = db.exec(
+
+    # Define the full set of default categories that should exist.
+    default_categories_data = [
+        {"name": "Work", "color": "#3b82f6"}, 
+        {"name": "Study", "color": "#22c55e"},
+        {"name": "Skill Development", "color": "#14b8a6"}, 
+        {"name": "Spiritual & Faith", "color": "#f59e0b"},
+        {"name": "Health & Fitness", "color": "#ef4444"}, 
+        {"name": "Personal Time", "color": "#8b5cf6"},
+        {"name": "Family & Social", "color": "#eab308"}, 
+        {"name": "Social Media", "color": "#ec4899"},
+        {"name": "Leisure & Hobbies", "color": "#06b6d4"}, 
+        {"name": "Eating & Nutrition", "color": "#f97316"},
+        {"name": "Transportation", "color": "#64748b"}, 
+        {"name": "Home & Chores", "color": "#78716c"},
+        {"name": "Sleep", "color": "#4f46e5"},
+    ]
+
+    # Get all default categories for the user
+    user_defaults = db.exec(
         select(Category).where(Category.user_id == user_id, Category.is_default == True)
     ).all()
-    
-    # The Critical if Statement: If no defaults exist, trigger seeding logic
-    if not existing_defaults:
-        # Create the 13 default category objects in memory
-        default_categories_data = [
-            {"name": "Work", "color": "#3b82f6"}, 
-            {"name": "Study", "color": "#22c55e"},
-            {"name": "Skill Development", "color": "#14b8a6"}, 
-            {"name": "Spiritual & Faith", "color": "#f59e0b"},
-            {"name": "Health & Fitness", "color": "#ef4444"}, 
-            {"name": "Personal Time", "color": "#8b5cf6"},
-            {"name": "Family & Social", "color": "#eab308"}, 
-            {"name": "Social Media", "color": "#ec4899"},
-            {"name": "Leisure & Hobbies", "color": "#06b6d4"}, 
-            {"name": "Eating & Nutrition", "color": "#f97316"},
-            {"name": "Transportation", "color": "#64748b"}, 
-            {"name": "Home & Chores", "color": "#78716c"},
-            {"name": "Sleep", "color": "#4f46e5"},
-        ]
+
+    # Data migration: Check for old 'Spiritual' and 'Faith' categories
+    spiritual_category = next((c for c in user_defaults if c.name == "Spiritual"), None)
+    faith_category = next((c for c in user_defaults if c.name == "Faith"), None)
+    spiritual_faith_category = next((c for c in user_defaults if c.name == "Spiritual & Faith"), None)
+
+    if (spiritual_category or faith_category) and not spiritual_faith_category:
+        # 1. Create the new merged category
+        new_sf_category = Category(
+            name="Spiritual & Faith", 
+            color="#f59e0b", 
+            user_id=user_id, 
+            is_default=True
+        )
+        db.add(new_sf_category)
+        db.commit()
+        db.refresh(new_sf_category)
+
+        # 2. Re-assign activities from 'Spiritual' and 'Faith' to the new category
+        if spiritual_category:
+            db.exec(
+                LoggedActivity.__table__.update()
+                .where(LoggedActivity.category_id == spiritual_category.id)
+                .values(category_id=new_sf_category.id)
+            )
+        if faith_category:
+            db.exec(
+                LoggedActivity.__table__.update()
+                .where(LoggedActivity.category_id == faith_category.id)
+                .values(category_id=new_sf_category.id)
+            )
+
+        # 3. Delete the old categories
+        if spiritual_category:
+            db.delete(spiritual_category)
+        if faith_category:
+            db.delete(faith_category)
         
-        # Add all 13 of these new objects to the database session and commit
-        for cat_data in default_categories_data:
+        db.commit()
+
+        # Refresh the list of user defaults
+        user_defaults = db.exec(
+            select(Category).where(Category.user_id == user_id, Category.is_default == True)
+        ).all()
+
+    # Idempotent Seeding: Check for missing default categories and create them.
+    existing_default_names = {cat.name for cat in user_defaults}
+    missing_defaults = [
+        cat_data for cat_data in default_categories_data 
+        if cat_data["name"] not in existing_default_names
+    ]
+
+    if missing_defaults:
+        for cat_data in missing_defaults:
             new_category = Category(
                 name=cat_data["name"], 
                 color=cat_data["color"], 
@@ -76,14 +124,13 @@ def get_user_categories(db: DBSession, clerk_session: ClerkSession):
                 is_default=True
             )
             db.add(new_category)
-        
         db.commit()
-    
-    # Return the Complete List: Fetch the user's complete list (defaults + custom) and return
-    user_categories = db.exec(
+
+    # Return the complete list of categories for the user (defaults + custom)
+    all_user_categories = db.exec(
         select(Category).where(Category.user_id == user_id)
     ).all()
-    return user_categories
+    return all_user_categories
 
 @router.post("", response_model=CategoryRead)
 def create_category(category: CategoryCreate, db: DBSession, clerk_session: ClerkSession):

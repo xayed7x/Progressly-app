@@ -16,6 +16,7 @@
 # next.js
 /.next/
 /out/
+/progressly/.next
 
 # production
 /build
@@ -47,3 +48,7 @@ next-env.d.ts
 __pycache__/
 *.pyc
 venv/
+/progressly-api/__pycache__
+
+# generated files
+/progressly/public/sw.js
