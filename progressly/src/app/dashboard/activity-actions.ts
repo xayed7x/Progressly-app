@@ -64,3 +64,36 @@ export async function logActivity(
     return { success: false, error: "An unexpected error occurred." };
   }
 }
+
+export async function deleteActivity(activityId: number) {
+  const { getToken } = await auth();
+  const token = await getToken({ template: "fastapi" });
+
+  if (!token) {
+    return { success: false, error: "User not authenticated." };
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/activities/${activityId}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error("API Error:", errorData);
+      return {
+        success: false,
+        error: errorData.detail || "Failed to delete activity",
+      };
+    }
+
+    revalidatePath("/dashboard");
+    return { success: true, data: { message: "Activity deleted" } };
+  } catch (error) {
+    console.error("Network or other error:", error);
+    return { success: false, error: "An unexpected error occurred." };
+  }
+}

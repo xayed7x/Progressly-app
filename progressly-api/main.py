@@ -411,3 +411,27 @@ def update_activity(
         category_id=activity.category_id,
         category=category
     )
+
+# === Activity Delete Endpoint ===
+@app.delete("/api/activities/{activity_id}", status_code=200)
+def delete_activity(
+    activity_id: int,
+    db: DBSession,
+    clerk_session: ClerkSession
+):
+    user_id = clerk_session.payload['sub']
+    
+    # Fetch the activity from the database
+    activity = db.get(LoggedActivity, activity_id)
+    if not activity:
+        raise HTTPException(status_code=404, detail="Activity not found")
+    
+    # Verify ownership - critical security check
+    if activity.user_id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this activity")
+    
+    # Delete the activity
+    db.delete(activity)
+    db.commit()
+    
+    return {"success": True, "message": "Activity deleted successfully"}
