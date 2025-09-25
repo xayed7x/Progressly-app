@@ -45,7 +45,7 @@ export default function ActivityCard({
   const handleDelete = async () => {
     setIsDeleting(true);
     try {
-      await deleteActivity(activity.id);
+      await deleteActivity(Number(activity.id));
       onActivityUpdated(); // Trigger SWR mutation to refresh the list
     } catch (error) {
       console.error("Failed to delete activity", error);
