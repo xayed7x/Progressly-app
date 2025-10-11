@@ -19,7 +19,14 @@ export type Category = {
 };
 
 export type ActivityReadWithCategory = Activity & {
-  category: Category;
+  category: Category | null;
+};
+
+export type Message = {
+  id: string;
+  role: 'user' | 'ai';
+  content: string;
+  status?: 'pending' | 'sent';
 };
 
 export type DailySummaryItem = {

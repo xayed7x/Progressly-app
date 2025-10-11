@@ -4,10 +4,10 @@ import logging
 from datetime import date
 from typing import List
 from fastapi import APIRouter, Depends
-from sqlmodel import SQLModel, select, func, case
+from sqlmodel import SQLModel, Session, select, func, case
 
 # --- Import our new, clean dependencies ---
-from dependencies import DBSession, ClerkSession, bearer_scheme
+from dependencies import get_current_user, get_db_session
 from models import Category, LoggedActivity
 
 
@@ -31,14 +31,12 @@ router = APIRouter(
 @router.get(
     "/daily/{summary_date}",
     response_model=List[DailySummaryItem],
-    dependencies=[Depends(bearer_scheme)]  # This now works perfectly!
 )
-def get_daily_summary(summary_date: date, db: DBSession, clerk_session: ClerkSession):
+def get_daily_summary(summary_date: date, db: Session = Depends(get_db_session), user_id: str = Depends(get_current_user)):
     """
     Calculates the total time spent in each category for a specific user on a given date.
     This endpoint powers the daily data visualization chart.
     """
-    user_id = clerk_session.payload['sub']
 
     duration_calculation = case(
         (LoggedActivity.end_time < LoggedActivity.start_time,

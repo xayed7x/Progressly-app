@@ -2,22 +2,20 @@
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-import { auth } from "@clerk/nextjs/server";
+import { createServerActionClient } from "@supabase/auth-helpers-nextjs";
+import { cookies } from "next/headers";
 
 export async function createGoal(formData: FormData) {
-  // The 'await' here is the final fix.
-  // We must wait for the auth() promise to resolve.
-  const { userId, getToken } = await auth();
+  const supabase = createServerActionClient({ cookies });
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
-  if (!userId) {
+  if (!session) {
     return { success: false, error: "User not authenticated." };
   }
 
-  const token = await getToken({ template: "fastapi" });
-
-  if (!token) {
-    return { success: false, error: "Authentication token is missing." };
-  }
+  const token = session.access_token;
 
   const goalContent = formData.get("goal") as string;
   if (!goalContent) {

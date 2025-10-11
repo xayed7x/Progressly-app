@@ -1,32 +1,41 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-import { NextResponse } from "next/server";
+import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
+import { NextResponse } from 'next/server'
 
-const isPublicRoute = createRouteMatcher([
-  "/",
-  "/manifest.json",
-  "/sign-in(.*)",
-  "/sign-up(.*)",
-]);
+import type { NextRequest } from 'next/server'
 
-export default clerkMiddleware(async (auth, req) => {
-  // If a logged-in user tries to visit the public homepage,
-  // redirect them to their dashboard.
-  const { userId } = await auth();
-  if (userId && req.nextUrl.pathname === "/") {
-    const dashboardUrl = new URL("/dashboard", req.url);
-    return NextResponse.redirect(dashboardUrl);
+export async function middleware(req: NextRequest) {
+  const res = NextResponse.next()
+  const supabase = createMiddlewareClient({ req, res })
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  // if user is signed in and the current path is /login, redirect to /dashboard
+  if (session && req.nextUrl.pathname === '/login') {
+    return NextResponse.redirect(new URL('/dashboard', req.url))
   }
 
-  if (!isPublicRoute(req)) {
-    await auth.protect();
+  // if user is not signed in and the current path is not /login, redirect to /login
+  if (!session && req.nextUrl.pathname !== '/login') {
+    // Allow access to the root page and auth callback
+    if (req.nextUrl.pathname === '/' || req.nextUrl.pathname.startsWith('/auth/callback')) {
+        return res
+    }
+    return NextResponse.redirect(new URL('/', req.url))
   }
-});
+
+  return res
+}
 
 export const config = {
   matcher: [
-    // Skip Next.js internals and all static files, unless found in search params
-    "/((?!_next|[^?]*.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
-    // Always run for API routes
-    "/(api|trpc)(.*)",
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     */
+    '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
-};
+}

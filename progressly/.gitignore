@@ -35,3 +35,6 @@ package-lock.json
 public/sw.js
 public/workbox-*.js
 public/swe-worker-development.js
+
+# clerk configuration (can include secrets)
+/.clerk/

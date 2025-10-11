@@ -1,6 +1,6 @@
 'use client';
 
-import { useAuth } from '@clerk/nextjs';
+import { getSupabaseBrowserClient } from '@/lib/supabase-client';
 import useSWR from 'swr';
 import { DailySummaryChart, ChartSkeleton } from '../_components/DailySummaryChart';
 import { DailySummaryItem, PieChartData } from '@/lib/types';
@@ -8,10 +8,11 @@ import { DailySummaryItem, PieChartData } from '@/lib/types';
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:8000';
 
 export default function InsightsPage() {
-  const { getToken } = useAuth();
+  const supabase = getSupabaseBrowserClient();
 
   const fetcher = async (url: string) => {
-    const token = await getToken({ template: 'fastapi' });
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
     if (!token) {
       throw new Error('User is not authenticated.');
     }

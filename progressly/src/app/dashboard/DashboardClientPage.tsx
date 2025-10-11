@@ -2,7 +2,8 @@
 
 import { storeAuthToken } from '@/lib/token-manager';
 import { Suspense, useState, useEffect, useMemo } from 'react';
-import { useUser, useAuth } from '@clerk/nextjs';
+import { getSupabaseBrowserClient } from '@/lib/supabase-client';
+import type { User } from '@supabase/supabase-js';
 import useSWR from 'swr';
 import { isToday, subDays, parseISO, addDays } from 'date-fns';
 
@@ -43,31 +44,47 @@ function calculateDuration(startTime: string, endTime: string): number {
 export default function DashboardClientPage({
   goalManager,
 }: {
-  goalManager: React.ReactNode;
+  goalManager?: React.ReactNode;
 }) {
-  const { user } = useUser();
-  const { getToken } = useAuth();
+  const supabase = getSupabaseBrowserClient();
+  const [user, setUser] = useState<User | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [optimisticActivities, setOptimisticActivities] = useState<
     ActivityReadWithCategory[]
   >([]);
 
   useEffect(() => {
-    const storeToken = async () => {
-      const token = await getToken({ template: 'fastapi' });
-      if (token) {
-        await storeAuthToken(token);
+    const initializeUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        await storeAuthToken(session.access_token);
       }
     };
 
-    storeToken(); // Store token on initial load
-    const intervalId = setInterval(storeToken, 10 * 60 * 1000); // Store token every 10 minutes
+    initializeUser();
 
-    return () => clearInterval(intervalId);
-  }, [getToken]);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (session?.access_token) {
+          await storeAuthToken(session.access_token);
+        }
+        const { data: { user } } = await supabase.auth.getUser();
+        setUser(user);
+      }
+    );
+
+    return () => {
+      subscription?.unsubscribe();
+    };
+  }, [supabase]);
 
   const fetcher = async (url: string) => {
-    const token = await getToken({ template: 'fastapi' });
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+
     if (!token) {
       throw new Error('User is not authenticated.');
     }
@@ -120,6 +137,9 @@ export default function DashboardClientPage({
   const activitiesForSelectedDate = useMemo(() => {
     if (!bootstrapData) return [];
     return bootstrapData.activities_last_3_days.filter(act => {
+      // Safety check: ensure activity_date exists
+      if (!act.activity_date) return false;
+      
       // Important: Compare dates without time component
       const activityDate = parseISO(act.activity_date).toDateString();
       return activityDate === selectedDate.toDateString();
@@ -183,7 +203,19 @@ export default function DashboardClientPage({
 
   // New handler for when an activity is logged
   const handleActivityLogged = (newActivity: ActivityReadWithCategory) => {
-    mutateBootstrap(); // Revalidate data
+    // Optimistically update the cache with the new activity
+    if (bootstrapData) {
+      mutateBootstrap(
+        {
+          ...bootstrapData,
+          activities_last_3_days: [...bootstrapData.activities_last_3_days, newActivity],
+        },
+        { revalidate: true } // Then revalidate from server
+      );
+    } else {
+      // If no bootstrap data yet, just force revalidation
+      mutateBootstrap(undefined, { revalidate: true });
+    }
 
     // Check if the logged activity is 'Sleep'
     if (newActivity.category?.name === 'Sleep') {
@@ -194,11 +226,13 @@ export default function DashboardClientPage({
     }
   };
 
+  const displayName = user?.user_metadata?.full_name || user?.email || 'Achiever';
+
   return (
     <main className="container mx-auto px-4 py-8">
       <div className="flex flex-col items-center justify-center gap-y-8">
         <h1 className="text-center text-3xl font-bold text-secondary">
-          Welcome back, {user?.firstName || 'Achiever'}!
+          Welcome back, {displayName.split(' ')[0]}!
         </h1>
 
         <ActivityLogger
@@ -247,4 +281,3 @@ export default function DashboardClientPage({
     </main>
   );
 }
-

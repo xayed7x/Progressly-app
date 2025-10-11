@@ -5,8 +5,8 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
-import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
+import { getSupabaseBrowserClient } from "@/lib/supabase-client";
 import { cn } from "@/lib/utils"; // Make sure you have this Shadcn utility
 
 const scenes = [
@@ -38,17 +38,22 @@ const scenes = [
 
 export default function HomePage() {
   const [activeIndex, setActiveIndex] = useState(0);
-  const { isSignedIn, isLoaded } = useAuth();
   const router = useRouter();
+  const supabase = getSupabaseBrowserClient();
 
   // Client-side authentication check and redirect
   useEffect(() => {
-    if (isLoaded) {
-      if (isSignedIn) {
-        router.replace('/dashboard');
+    const checkAuth = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session) {
+        router.replace("/dashboard");
       }
-    }
-  }, [isLoaded, isSignedIn, router]);
+    };
+
+    checkAuth();
+  }, [router, supabase]);
 
   const callback = () => {
     setActiveIndex((prevIndex) => (prevIndex + 1) % scenes.length);
@@ -86,11 +91,11 @@ export default function HomePage() {
         >
           {/* Background Image */}
           {activeScene.image ? (
-            <Image
+            <img
               src={activeScene.image}
               alt={activeScene.headline}
-              fill // This makes the image fill the parent div
-              className="object-cover brightness-[0.7]" // object-cover prevents distortion, brightness helps text stand out
+              style={{ objectFit: 'cover', position: 'absolute', height: '100%', width: '100%' }}
+              className="brightness-[0.7]" // object-cover prevents distortion, brightness helps text stand out
             />
           ) : (
             // Fallback for scenes without an image

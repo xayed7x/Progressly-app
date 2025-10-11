@@ -2,15 +2,17 @@
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-import { auth } from "@clerk/nextjs/server";
+import { createServerActionClient } from "@supabase/auth-helpers-nextjs";
+import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 
 export async function logActivity(
   formData: FormData,
   target_date: string // Add target_date parameter
 ) {
-  const { getToken } = await auth();
-  const token = await getToken({ template: "fastapi" });
+  const supabase = createServerActionClient({ cookies });
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
 
   if (!token) {
     return { success: false, error: "User not authenticated." };
@@ -66,8 +68,9 @@ export async function logActivity(
 }
 
 export async function deleteActivity(activityId: number) {
-  const { getToken } = await auth();
-  const token = await getToken({ template: "fastapi" });
+  const supabase = createServerActionClient({ cookies });
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
 
   if (!token) {
     return { success: false, error: "User not authenticated." };

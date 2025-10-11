@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { useAuth } from "@clerk/nextjs";
+import { getSupabaseBrowserClient } from "@/lib/supabase-client";
 import { updateActivity } from "@/lib/apiClient";
 import { useCategories } from "@/hooks/useCategories";
 
@@ -24,7 +24,7 @@ export function EditActivityDialog({
   onClose,
   onActivityUpdated,
 }: EditActivityDialogProps) {
-  const { getToken } = useAuth();
+  const supabase = getSupabaseBrowserClient();
   const { data: categories } = useCategories();
   
   // Form state - initialize with activity data
@@ -52,7 +52,8 @@ export function EditActivityDialog({
     setIsSubmitting(true);
     
     try {
-      const token = await getToken();
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
       if (!token) throw new Error("No authentication token");
 
       await updateActivity(Number(activity.id), {

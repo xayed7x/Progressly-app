@@ -6,7 +6,7 @@ from sqlalchemy import pool
 from alembic import context
 
 # ADD YOUR MODELS HERE
-from models import SQLModel, Goal, LoggedActivity # <-- THIS IS THE FIX
+from models import SQLModel, Goal, LoggedActivity, Category, DailyTarget # <-- THIS IS THE FIX
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

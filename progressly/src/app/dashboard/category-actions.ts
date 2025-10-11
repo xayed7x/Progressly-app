@@ -1,14 +1,16 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
+import { createServerActionClient } from "@supabase/auth-helpers-nextjs";
+import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 // --- Action to CREATE a new category ---
 export async function createCategory(formData: FormData) {
-  const { getToken } = await auth();
-  const token = await getToken({ template: "fastapi" });
+  const supabase = createServerActionClient({ cookies });
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
 
   if (!token) {
     return { success: false, error: "Not authenticated." };

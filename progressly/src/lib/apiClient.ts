@@ -3,7 +3,7 @@ import { DailySummaryItem } from "./types";
 /**
  * Fetches the daily summary data from the backend API.
  *
- * @param {() => Promise<string | null>} getToken - The getToken function from Clerk's useAuth hook.
+ * @param {string | null} token - The Supabase session access token.
  * @param {Date} date - The specific date to fetch the summary for.
  * @returns {Promise<DailySummaryItem[]>} - A promise that resolves to the summary data.
  */

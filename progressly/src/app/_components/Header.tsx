@@ -1,81 +1,78 @@
-import {
-  SignInButton,
-  SignUpButton,
-  SignedIn,
-  SignedOut,
-  UserButton,
-  ClerkLoaded,
-} from "@clerk/nextjs";
+'use client';
+
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import ResilientPwaButton from "./ResilientPwaButton";
+import { useSupabaseClient, useUser } from "@supabase/auth-helpers-react";
+
+const navLinks = [
+  { href: "/", label: "Home" },
+  { href: "/dashboard", label: "Dashboard" },
+  { href: "/goals", label: "Goals" },
+  { href: "/chat", label: "Chat" },
+  { href: "/features", label: "Features" },
+  { href: "/contact", label: "Contact" },
+];
 
 export default function Header() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const user = useUser();
+  const supabase = useSupabaseClient();
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push('/');
+    router.refresh(); // Ensure the layout re-renders and session state is cleared
+  };
+
   return (
     <header className="border-b border-secondary/10">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         {/* Logo */}
         <Link href="/" className="flex items-center">
-          <Image
-            src="/images/logo.png"
-            alt="Progressly Logo"
-            width={50}
-            height={32}
-          />
-        </Link>
+                      <img
+                        src="/images/logo.png"
+                        alt="Progressly Logo"
+                        width={50}
+                        height={32}
+                      />        </Link>
 
         {/* Navigation Links - Hidden on mobile, shown on desktop */}
         <nav className="hidden md:flex items-center space-x-8">
-          <Link 
-            href="/" 
-            className="text-textLight hover:text-accent transition-colors duration-200"
-          >
-            Home
-          </Link>
-          <Link 
-            href="/dashboard" 
-            className="text-textLight hover:text-accent transition-colors duration-200"
-          >
-            Dashboard
-          </Link>
-          <Link 
-            href="/features" 
-            className="text-textLight hover:text-accent transition-colors duration-200"
-          >
-            Features
-          </Link>
-          <Link 
-            href="/contact" 
-            className="text-textLight hover:text-accent transition-colors duration-200"
-          >
-            Contact
-          </Link>
+          {navLinks.map((link) => {
+            const isActive =
+              link.href === "/"
+                ? pathname === link.href
+                : pathname.startsWith(link.href);
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`transition-colors duration-200 ${
+                  isActive
+                    ? "text-accent"
+                    : "text-textLight hover:text-accent"
+                }`}
+              >
+                {link.label}
+              </Link>
+            );
+          })}
         </nav>
 
         <div className="flex items-center gap-x-4">
-          {/* The PWA button is now a direct child of the main flex container,
-              so it will render immediately. */}
           <ResilientPwaButton />
           
-          <ClerkLoaded>
-            {/* The Sign In/Up and UserButton remain inside ClerkLoaded */}
-            <SignedOut>
-              <SignInButton mode="modal">
-                <Button className="bg-accent1 text-primary hover:bg-accent1/90">
-                  Sign In
-                </Button>
-              </SignInButton>
-              <SignUpButton mode="modal">
-                <Button className="bg-accent1 text-primary hover:bg-accent1/90">
-                  Sign Up
-                </Button>
-              </SignUpButton>
-            </SignedOut>
-            <SignedIn>
-              <UserButton />
-            </SignedIn>
-          </ClerkLoaded>
+          {user ? (
+            <Button variant="outline" onClick={handleLogout}>Logout</Button>
+          ) : (
+            <Link href="/login">
+              <Button variant="outline">Login</Button>
+            </Link>
+          )}
         </div>
       </div>
     </header>

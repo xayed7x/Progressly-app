@@ -48,3 +48,41 @@
     --ring: 212.7 26.8% 83.9%;
   }
 }
+
+/* Toast Dark Theme Override - High Specificity Rules */
+@layer components {
+  /* Target the toast root element with high specificity */
+  [data-radix-toast-viewport] {
+    z-index: 100;
+  }
+
+  /* Ensure all toast elements use dark theme colors */
+  [data-radix-toast-viewport] [data-state="open"],
+  [data-radix-toast-viewport] [data-state="closed"] {
+    background: hsl(var(--background)) !important;
+    color: hsl(var(--foreground)) !important;
+    border-color: hsl(var(--border)) !important;
+  }
+
+  /* Destructive variant styling */
+  [data-radix-toast-viewport] .destructive {
+    background: hsl(var(--destructive)) !important;
+    color: hsl(var(--destructive-foreground)) !important;
+    border-color: hsl(var(--destructive)) !important;
+  }
+
+  /* Toast title and description */
+  [data-radix-toast-viewport] [data-radix-toast-title],
+  [data-radix-toast-viewport] [data-radix-toast-description] {
+    color: inherit !important;
+  }
+
+  /* Close button styling */
+  [data-radix-toast-viewport] button[toast-close] {
+    color: hsl(var(--foreground) / 0.5) !important;
+  }
+
+  [data-radix-toast-viewport] button[toast-close]:hover {
+    color: hsl(var(--foreground)) !important;
+  }
+}
