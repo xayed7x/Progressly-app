@@ -43,7 +43,9 @@ export const defaultCategoryHexColors: { [key: string]: string } = {
   "Personal Time": "#8b5cf6",
   "Family & Social": "#eab308",
   "Social Media": "#ec4899",
-  
+  "Eating & Nutrition": "#f97316",
+  Transportation: "#64748b",
+  "Leisure & Hobbies": "#06b6d4",
   "Home & Chores": "#78716c",
   Sleep: "#4f46e5",
 };

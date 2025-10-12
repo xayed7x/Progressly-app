@@ -14,6 +14,7 @@ import {
   Cell,
 } from 'recharts';
 import { PieChartData } from '@/lib/types';
+import { defaultCategoryHexColors } from '@/lib/constants';
 import { CATEGORY_CONFIG } from '@/lib/category-config';
 
 // Shadcn UI components
@@ -41,7 +42,7 @@ const CustomTooltip = ({ active, payload }: any) => {
 
     return (
       <div className="p-2 text-sm bg-primary/90 backdrop-blur-sm border border-white/20 rounded-md shadow-lg text-secondary">
-        <p className="font-bold" style={{ color: data.color }}>
+        <p className="font-bold" style={{ color: defaultCategoryHexColors[data.name] || data.color }}>
           {data.name}
         </p>
         <p className="text-muted-foreground">{`Total: ${timeString}`}</p>
@@ -58,7 +59,9 @@ const CustomLegend = ({ data }: { data: PieChartData[] }) => (
       <div key={`legend-${entry.id}`} className="flex items-center gap-2">
         <div
           className="w-3 h-3 rounded-sm"
-          style={{ backgroundColor: entry.color }}
+          style={{
+            backgroundColor: defaultCategoryHexColors[entry.name] || entry.color,
+          }}
         />
         <span>{entry.name}</span>
       </div>
@@ -201,7 +204,10 @@ export function DailySummaryChart({ selectedDate, data }: DailySummaryChartProps
                     outerRadius={120}
                   >
                     {data.map((entry) => (
-                      <Cell key={`cell-${entry.id}`} fill={entry.color} />
+                      <Cell
+                        key={`cell-${entry.id}`}
+                        fill={defaultCategoryHexColors[entry.name] || entry.color}
+                      />
                     ))}
                   </Pie>
                 </PieChart>
@@ -237,7 +243,10 @@ export function DailySummaryChart({ selectedDate, data }: DailySummaryChartProps
                   />
                   <Bar dataKey="duration" radius={[4, 4, 0, 0]}>
                     {data.map((entry) => (
-                      <Cell key={`cell-${entry.id}`} fill={entry.color} />
+                      <Cell
+                        key={`cell-${entry.id}`}
+                        fill={defaultCategoryHexColors[entry.name] || entry.color}
+                      />
                     ))}
                   </Bar>
                 </BarChart>
