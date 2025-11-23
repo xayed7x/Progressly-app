@@ -37,7 +37,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { Category } from '@/lib/types'; // Import Category from shared types
+import { Category, DailyTarget } from '@/lib/types'; // Import Category and DailyTarget from shared types
 import { updateDailyTarget } from '../actions';
 import { useSupabaseClient } from '@supabase/auth-helpers-react';
 import { useToast } from '@/hooks/use-toast';

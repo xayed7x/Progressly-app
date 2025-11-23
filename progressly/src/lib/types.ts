@@ -41,6 +41,7 @@ export interface PieChartData {
   name: string;
   duration: number;
   color: string;
+  [key: string]: any; // Index signature for Recharts compatibility
 }
 
 export interface DashboardBootstrapData {
@@ -50,4 +51,11 @@ export interface DashboardBootstrapData {
   pie_chart_data: PieChartData[];
   last_end_time: string | null;
   categories: Category[];
+}
+
+export interface DailyTarget {
+  id: number;
+  user_id: string;
+  category_name: string;
+  target_hours: number;
 }

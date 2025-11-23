@@ -25,13 +25,7 @@ import {
 import { EditTargetModal } from './_EditTargetModal';
 import { Category } from '@/lib/types'; // Import Category from shared types
 
-// Define DailyTarget locally since it's not in shared types
-type DailyTarget = {
-  id: number;
-  user_id: string;
-  category_name: string;
-  target_hours: number;
-};
+import { DailyTarget } from '@/lib/types';
 
 type TargetListProps = {
   targets: DailyTarget[];
