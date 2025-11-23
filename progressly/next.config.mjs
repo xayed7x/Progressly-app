@@ -12,6 +12,22 @@ const nextConfig = {
   },
   // Add this line to resolve the lockfile warning
   outputFileTracingRoot: path.resolve(__dirname, '../'),
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**.googleusercontent.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.supabase.co',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.supabase.in',
+      },
+    ],
+  },
   async rewrites() {
     return [
       {

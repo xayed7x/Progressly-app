@@ -127,11 +127,19 @@ export default function GoalsPage() {
   };
 
   const handleSaveTarget = async (categoryName: string) => {
-    const hours = parseInt(editedHours) || 0;
-    const minutes = parseInt(editedMinutes) || 0;
+    const hours = editedHours === "" ? 0 : parseInt(editedHours) || 0;
+    const minutes = editedMinutes === "" ? 0 : parseInt(editedMinutes) || 0;
     const totalHours = hours + (minutes / 60);
 
-    if (totalHours < 0 || totalHours > 24) return;
+    // Allow saving 0 hours (to clear a target), but prevent invalid values
+    if (totalHours < 0 || totalHours > 24) {
+      toast({
+        title: "Invalid value",
+        description: "Target must be between 0 and 24 hours.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
       const result = await saveDailyTarget(categoryName, totalHours);
@@ -142,6 +150,8 @@ export default function GoalsPage() {
       
       setTargets(prev => ({ ...prev, [categoryName]: totalHours }));
       setEditingTarget(null);
+      setEditedHours("");
+      setEditedMinutes("");
       toast({
         title: "Target updated!",
         description: `${categoryName} target has been saved.`,
@@ -156,10 +166,16 @@ export default function GoalsPage() {
   };
 
   const startEditingTarget = (categoryName: string, currentValue: number) => {
-    const hours = Math.floor(currentValue);
-    const minutes = Math.round((currentValue - hours) * 60);
-    setEditedHours(hours.toString());
-    setEditedMinutes(minutes.toString());
+    // If current value is 0, start with empty strings instead of "0"
+    if (currentValue === 0) {
+      setEditedHours("");
+      setEditedMinutes("");
+    } else {
+      const hours = Math.floor(currentValue);
+      const minutes = Math.round((currentValue - hours) * 60);
+      setEditedHours(hours.toString());
+      setEditedMinutes(minutes.toString());
+    }
     setEditingTarget(categoryName);
   };
 
@@ -287,7 +303,8 @@ export default function GoalsPage() {
                         <span className="font-medium text-white text-lg">{cat.name}</span>
                       </div>
                       <Button
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           if (isEditing) {
                             handleSaveTarget(cat.name);
                           } else {
@@ -297,6 +314,7 @@ export default function GoalsPage() {
                         size="sm"
                         variant="ghost"
                         className="h-9 w-9 p-0"
+                        type={isEditing ? "button" : "button"}
                       >
                         {isEditing ? (
                           <Check className="h-4 w-4 text-accent" />
@@ -308,15 +326,7 @@ export default function GoalsPage() {
 
                     {/* Second row: Time input/display */}
                     {isEditing ? (
-                      <div 
-                        className="flex items-center gap-2"
-                        onBlur={(e) => {
-                          // Only cancel if clicking outside the entire card
-                          if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-                            cancelEditing();
-                          }
-                        }}
-                      >
+                      <div className="flex items-center gap-2">
                         <div className="flex-1 flex items-center gap-2">
                           <Input
                             type="number"
@@ -324,8 +334,8 @@ export default function GoalsPage() {
                             max="24"
                             value={editedHours}
                             onChange={(e) => setEditedHours(e.target.value)}
-                            className="flex-1 bg-black/50 border-gray-700 text-center h-12 text-lg [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                            placeholder="0"
+                            className="flex-1 bg-black/50 border-gray-700 text-center h-12 text-lg text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            placeholder=""
                             autoFocus
                           />
                           <span className="text-sm text-gray-400">hrs</span>
@@ -335,8 +345,8 @@ export default function GoalsPage() {
                             max="59"
                             value={editedMinutes}
                             onChange={(e) => setEditedMinutes(e.target.value)}
-                            className="flex-1 bg-black/50 border-gray-700 text-center h-12 text-lg [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                            placeholder="0"
+                            className="flex-1 bg-black/50 border-gray-700 text-center h-12 text-lg text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            placeholder=""
                           />
                           <span className="text-sm text-gray-400">min</span>
                         </div>

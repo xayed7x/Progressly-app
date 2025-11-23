@@ -217,6 +217,14 @@ Creator Inquiry: If asked who created you, respond: "I was created by Zayed bin 
                     user_prompt = msg.content
                     break
         
+        # Validate that we have a user prompt
+        if not user_prompt or not user_prompt.strip():
+            error_msg = "I didn't receive your message. Please try asking your question again."
+            print(f"DEBUG: Empty user prompt. Chat history: {len(chat_history) if chat_history else 0} messages")
+            yield error_msg.encode("utf-8")
+            full_ai_response_content = error_msg
+            return
+        
         # Construct the final prompt for the model
         meta_prompt = (
             f"{system_prompt}\n\n"
@@ -227,6 +235,8 @@ Creator Inquiry: If asked who created you, respond: "I was created by Zayed bin 
             f"--- USER'S QUESTION ---\n"
             f"{user_prompt}"
         )
+        
+        print(f"DEBUG: Sending prompt to Gemini. User prompt length: {len(user_prompt)}, Activities context length: {len(activities_context)}")
         
         # Make a single, direct call to generate_content_stream with the meta-prompt
         contents = [
@@ -243,23 +253,48 @@ Creator Inquiry: If asked who created you, respond: "I was created by Zayed bin 
         )
         
         # Initiate the streaming generation call with stable model
-        stream = client.models.generate_content_stream(
-            model="models/gemini-2.5-flash",
-            contents=contents,
-            config=generation_config
-        )
+        try:
+            stream = client.models.generate_content_stream(
+                model="models/gemini-2.5-flash",
+                contents=contents,
+                config=generation_config
+            )
+        except Exception as stream_init_error:
+            error_msg = f"Error initializing Gemini stream: {str(stream_init_error)}"
+            print(f"DEBUG: {error_msg}")
+            yield error_msg.encode("utf-8")
+            full_ai_response_content = error_msg
+            return
 
         # Track what we've already sent to avoid duplicates
         chunk_count = 0
+        text_chunk_count = 0
         
-        for chunk in stream:
-            chunk_count += 1
-            chunk_text = getattr(chunk, "text", None)
-            if chunk_text is not None:
-                full_ai_response_content += chunk_text
-                yield chunk_text.encode("utf-8")
-        
-        print(f"DEBUG: Stream completed. Total chunks: {chunk_count}, Total length: {len(full_ai_response_content)}")
+        try:
+            for chunk in stream:
+                chunk_count += 1
+                chunk_text = getattr(chunk, "text", None)
+                if chunk_text is not None and chunk_text.strip():
+                    text_chunk_count += 1
+                    full_ai_response_content += chunk_text
+                    yield chunk_text.encode("utf-8")
+                else:
+                    # Log chunks without text for debugging
+                    print(f"DEBUG: Chunk {chunk_count} has no text. Chunk type: {type(chunk)}, Attributes: {dir(chunk)}")
+            
+            print(f"DEBUG: Stream completed. Total chunks: {chunk_count}, Text chunks: {text_chunk_count}, Total length: {len(full_ai_response_content)}")
+            
+            # If we got chunks but no text, provide a helpful message
+            if chunk_count > 0 and len(full_ai_response_content) == 0:
+                error_msg = "I received your message but couldn't generate a response. This might be because you don't have any activities logged yet. Try logging some activities first, or ask me about setting up your goals!"
+                print(f"DEBUG: Stream returned {chunk_count} chunks but no text content")
+                yield error_msg.encode("utf-8")
+                full_ai_response_content = error_msg
+        except Exception as stream_error:
+            error_msg = f"Error reading stream: {str(stream_error)}"
+            print(f"DEBUG: {error_msg}")
+            yield error_msg.encode("utf-8")
+            full_ai_response_content = error_msg
 
     except Exception as e:
         error_message = f"Error during streaming with Gemini API: {e}"
@@ -331,6 +366,11 @@ async def stream_chat(
     """
     try:
         user_uuid = UUID(user_id)
+        
+        # Debug: Log the incoming request
+        print(f"DEBUG: Chat request received. User: {user_id}, Messages count: {len(request.messages) if request.messages else 0}")
+        if request.messages:
+            print(f"DEBUG: Last message role: {request.messages[-1].role if request.messages else 'N/A'}, Content preview: {request.messages[-1].content[:50] if request.messages and request.messages[-1].content else 'N/A'}")
         
         # Step 1: Find or create conversation and save user message in a single atomic transaction
         conversation_id = None
