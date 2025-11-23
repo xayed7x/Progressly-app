@@ -2,16 +2,19 @@
 
 import { Toaster } from "@/components/ui/toaster";
 import { PwaUpdater } from "@/components/PwaUpdater";
-import Header from "./_components/Header";
 import BottomNav from "./_components/BottomNav";
 
+import { usePathname } from "next/navigation";
+
 export default function Providers({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const isHomePage = pathname === "/";
+
   return (
     <>
       <div className="font-sans bg-primary text-textLight flex flex-col flex-grow">
-        <Header />
         <main className="flex-grow overflow-y-auto pb-16 md:pb-0">{children}</main>
-        <BottomNav />
+        {!isHomePage && <BottomNav />}
       </div>
       <PwaUpdater />
       <Toaster />

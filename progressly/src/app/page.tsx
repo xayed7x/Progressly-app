@@ -7,31 +7,20 @@ import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase-client";
-import { cn } from "@/lib/utils"; // Make sure you have this Shadcn utility
+import { cn } from "@/lib/utils";
+import AuthCard from "./_components/AuthCard";
 
 const scenes = [
   {
-    headline: "Own Your Day. Master Your Life.",
-    subtext:
-      "The AI-powered guardian that guides you from where you are to where you dream to be.",
     image: "/images/scene-1.png",
   },
   {
-    headline: "Track Your 24 Hours with Zero Friction.",
-    subtext:
-      "Log your entire day with an intelligent, fast, and beautiful interface designed for clarity.",
     image: "/images/scene-2.png",
   },
   {
-    headline: "Discover Where Your Time Truly Goes.",
-    subtext:
-      "Our AI analyzes your patterns to provide powerful insights, helping you align your actions with your ambitions.",
     image: "/images/scene-3.png",
   },
   {
-    headline: "Build the Discipline for Success.",
-    subtext:
-      "Small, consistent steps lead to remarkable results. Start building your future, one hour at a time.",
     image: "/images/scene-4.png",
   },
 ];
@@ -72,80 +61,55 @@ export default function HomePage() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleDotClick = (index: number) => {
-    setActiveIndex(index);
-  };
-
   const activeScene = scenes[activeIndex];
 
   return (
-    <main className="relative h-[calc(100vh-4rem)] w-full overflow-hidden">
+    <main className="relative h-screen w-full overflow-hidden bg-black">
       <AnimatePresence mode="wait">
         <motion.div
           key={activeIndex}
           className="absolute inset-0"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0.5 }}
-          transition={{ duration: 1.0 }}
+          initial={{ opacity: 0, scale: 1.05 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 1.5 }}
         >
           {/* Background Image */}
           {activeScene.image ? (
-            <img
+            <Image
               src={activeScene.image}
-              alt={activeScene.headline}
-              style={{ objectFit: 'cover', position: 'absolute', height: '100%', width: '100%' }}
-              className="brightness-[0.7]" // object-cover prevents distortion, brightness helps text stand out
+              alt="Background"
+              fill
+              className="object-cover brightness-[0.8]"
+              priority
             />
           ) : (
-            // Fallback for scenes without an image
             <div className="absolute inset-0 bg-primary" />
           )}
 
-          {/* Gradient Overlay for Text Readability */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
-
-          {/* Text Content & Navigation */}
-          <div className="relative z-10 flex h-full flex-col items-center justify-end p-6 text-center md:p-12">
-            <div className="max-w-3xl">
-              <h1 className="font-serif text-4xl font-bold leading-tight text-secondary md:text-6xl">
-                {activeScene.headline}
-              </h1>
-              <p className="mt-4 text-lg text-white-soft/80 md:text-xl">
-                {activeScene.subtext}
-              </p>
-            </div>
-
-            {/* Navigation Dots with Timer Animation */}
-            <div className="mt-12 flex w-full items-center justify-center gap-3">
-              {scenes.map((_, index) => (
-                <button
-                  key={index}
-                  onClick={() => handleDotClick(index)}
-                  className={cn(
-                    "h-2 rounded-full transition-width duration-300", // Animate width changes
-                    {
-                      "w-8 bg-white/40": activeIndex === index,
-                      "w-2 bg-white/40 hover:bg-white/60":
-                        activeIndex !== index,
-                    }
-                  )}
-                >
-                  {/* The animated gold bar, only rendered for the active dot */}
-                  {activeIndex === index && (
-                    <motion.div
-                      className="h-full rounded-full bg-accent"
-                      initial={{ width: "0%" }}
-                      animate={{ width: "100%" }}
-                      transition={{ duration: 5, ease: "linear" }}
-                    />
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
+          {/* Gradient Overlay */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60" />
         </motion.div>
       </AnimatePresence>
+
+      {/* Logo or Brand Mark at Top */}
+      <div className="absolute top-12 left-0 right-0 z-10 flex justify-center">
+        <div className="flex flex-col items-center">
+           <Image
+             src="/images/logo.png"
+             alt="Progressly Logo"
+             width={60}
+             height={60}
+             className="drop-shadow-lg"
+           />
+           <h1 className="mt-2 text-2xl font-bold text-white tracking-wider drop-shadow-md font-serif">
+             PROGRESSLY
+           </h1>
+        </div>
+      </div>
+
+      {/* Auth Card Overlay */}
+      <AuthCard />
     </main>
   );
 }

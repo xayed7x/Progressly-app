@@ -6,7 +6,7 @@ import "./globals.css";
 import Providers from "./Providers";
 import { useState } from 'react';
 import { SessionContextProvider } from '@supabase/auth-helpers-react';
-import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { Database } from '@/lib/types_db';
 import { SupabaseClient } from '@supabase/supabase-js'; // Import SupabaseClient
 
@@ -15,13 +15,34 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [supabaseClient] = useState(() => createPagesBrowserClient<Database>());
+  const [supabaseClient] = useState(() => createClientComponentClient<Database>());
   return (
     <html
       lang="en"
       className={`dark ${inter.variable} ${playfair_display.variable} ${roboto_mono.variable}`}
+      suppressHydrationWarning
     >
       <head>
+        {/* Primary Meta Tags */}
+        <title>Progressly - Track Your 24 Hours & Achieve Your Goals</title>
+        <meta name="title" content="Progressly - Track Your 24 Hours & Achieve Your Goals" />
+        <meta name="description" content="Check your time and reach your goals. Progressly helps you track your 24 hours, plan better, and make progress toward your goals with AI-powered insights." />
+        
+        {/* Open Graph / Facebook */}
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://progressly-app.vercel.app" />
+        <meta property="og:title" content="Progressly - Track Your 24 Hours & Achieve Your Goals" />
+        <meta property="og:description" content="Check your time and reach your goals. Progressly helps you track your 24 hours, plan better, and make progress toward your goals with AI-powered insights." />
+        <meta property="og:image" content="https://progressly-app.vercel.app/images/logo.png" />
+        <meta property="og:site_name" content="Progressly" />
+        
+        {/* Twitter */}
+        <meta property="twitter:card" content="summary_large_image" />
+        <meta property="twitter:url" content="https://progressly-app.vercel.app" />
+        <meta property="twitter:title" content="Progressly - Track Your 24 Hours & Achieve Your Goals" />
+        <meta property="twitter:description" content="Check your time and reach your goals. Progressly helps you track your 24 hours, plan better, and make progress toward your goals with AI-powered insights." />
+        <meta property="twitter:image" content="https://progressly-app.vercel.app/images/logo.png" />
+        
         <link rel="manifest" href="/manifest.json" />
         {/* Google Search Console Verification */}
         <meta name="google-site-verification" content="hWY_M3uBePeRTT9uESKKM-lIlLHCvF7-9tluj1sB_Jw" />

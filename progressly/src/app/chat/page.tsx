@@ -27,7 +27,7 @@ interface ChatHistoryResponse {
 
 const initialWelcomeMessage: Message[] = [
   { 
-    id: uuidv4(), // Use a unique ID
+    id: uuidv4(),
     role: 'ai', 
     content: 'Hello! I am Progresso, your AI Coach. 🌱\n\nI\'m here to help you reflect on your activities, identify patterns, and provide actionable advice to improve your productivity and well-being.\n\nHow can I help you with your progress today?' 
   },
@@ -40,7 +40,6 @@ export default function ChatPage() {
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   
-  // ✅ --- CORRECTED: Added the fetcher function as the second argument
   const { data, error: swrError, isLoading } = useSWR<ChatHistoryResponse>('/api/chat/history', fetcher);
 
   const { isStreaming, isAiThinking, error: streamError, sendMessage } = useChatStream({ 
@@ -48,14 +47,11 @@ export default function ChatPage() {
     setMessages 
   });
 
-  // ✅ --- SIMPLIFIED: More robust effect logic
   useEffect(() => {
-    // Wait until the fetch is complete
     if (isLoading) {
       return; 
     }
     
-    // If we have history data, use it. Otherwise, use the welcome message.
     if (data && data.messages.length > 0) {
       setMessages(data.messages);
     } else {
@@ -79,7 +75,6 @@ export default function ChatPage() {
     const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
     setIsUserScrolledUp(!isAtBottom);
   };
-  
 
   const scrollToBottom = () => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -88,53 +83,87 @@ export default function ChatPage() {
 
   const displayError = swrError || streamError;
 
-  // Show a single loading state until the initial fetch is done
   if (isLoading) {
     return (
-      <div className="flex flex-col h-full items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
-        <p className="mt-4 text-gray-600">Loading chat history...</p>
+      <div className="min-h-screen bg-black text-white flex items-center justify-center relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
+          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-accent/20 rounded-full blur-[100px]" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/20 rounded-full blur-[100px]" />
+        </div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent z-10"></div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full relative">
-      <div 
-        ref={chatContainerRef}
-        onScroll={handleScroll}
-        className="flex-grow p-4 space-y-4 overflow-y-auto scroll-smooth"
-      >
-        {messages.map((message) => (
-          <UIChatMessage key={message.id} message={message} />
-        ))}
-        
-        {isAiThinking && <ThinkingIndicator />}
+    <div className="min-h-screen bg-black text-white flex flex-col relative overflow-hidden">
+      {/* Background Elements */}
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-accent/20 rounded-full blur-[100px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/20 rounded-full blur-[100px]" />
+      </div>
 
-        {displayError && (
-          <div className="p-4 bg-destructive/10 border border-destructive rounded-lg">
-            <p className="text-destructive text-sm font-medium">Error: {displayError.message}</p>
+      {/* Chat Container */}
+      <div className="flex-1 flex flex-col relative z-10">
+        {/* Messages Area */}
+        <div 
+          ref={chatContainerRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto"
+        >
+          <div className="max-w-3xl mx-auto px-4 py-8">
+            {/* Welcome message when empty */}
+            {messages.length === 1 && messages[0].role === 'ai' && (
+              <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
+                <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-accent to-blue-500 bg-clip-text text-transparent">
+                  What can I help with?
+                </h1>
+              </div>
+            )}
+
+            {/* Messages */}
+            <div className="space-y-6">
+              {messages.map((message, index) => (
+                <UIChatMessage 
+                  key={message.id} 
+                  message={message}
+                  isStreaming={isStreaming && index === messages.length - 1 && message.role === 'ai'}
+                />
+              ))}
+              
+              {isAiThinking && <ThinkingIndicator />}
+
+              {displayError && (
+                <div className="p-4 bg-red-500/10 border border-red-500/50 rounded-lg">
+                  <p className="text-red-400 text-sm font-medium">Error: {displayError.message}</p>
+                </div>
+              )}
+
+              <div ref={bottomRef} />
+            </div>
+          </div>
+        </div>
+
+        {/* Scroll to bottom button */}
+        {isUserScrolledUp && (
+          <div className="absolute bottom-32 left-1/2 transform -translate-x-1/2 z-20">
+            <Button
+              onClick={scrollToBottom}
+              size="icon"
+              className="rounded-full shadow-lg bg-gray-800 hover:bg-gray-700 text-white border border-gray-700"
+              aria-label="Scroll to bottom"
+            >
+              <ArrowDown className="h-5 w-5" />
+            </Button>
           </div>
         )}
 
-        <div ref={bottomRef} />
-      </div>
-
-      {isUserScrolledUp && (
-        <div className="absolute bottom-24 left-1/2 transform -translate-x-1/2 z-10">
-          <Button
-            onClick={scrollToBottom}
-            size="icon"
-            className="rounded-full shadow-lg bg-accent hover:bg-accent/90 text-black"
-            aria-label="Scroll to bottom"
-          >
-            <ArrowDown className="h-5 w-5" />
-          </Button>
+        {/* Input Area */}
+        <div className="flex-shrink-0 pb-6">
+          <div className="max-w-3xl mx-auto px-4">
+            <ChatInput onSubmit={handleSendMessage} />
+          </div>
         </div>
-      )}
-
-      <div className="flex-shrink-0 border-t bg-primary">
-        <ChatInput onSubmit={handleSendMessage} />
       </div>
     </div>
   );

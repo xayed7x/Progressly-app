@@ -4,9 +4,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem } from '@/components/ui/form';
-import { Send } from 'lucide-react';
+import { ArrowUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import TextareaAutosize from 'react-textarea-autosize';
 
@@ -39,23 +38,23 @@ export function ChatInput({ onSubmit }: ChatInputProps) {
     <Form {...form}>
       <form 
         onSubmit={form.handleSubmit(handleSubmit)} 
-        className="p-4 border-t bg-background"
+        className="w-full"
       >
-        {/* This is our new "Pill" Container */}
-        <div className="flex items-center p-2 px-4 rounded-full bg-primary border border-textLight">
+        {/* ChatGPT-style input container */}
+        <div className="relative flex items-end gap-2 p-3 rounded-3xl bg-gray-800/50 backdrop-blur-sm border border-gray-700 shadow-lg">
           
-          {/* The seamless FormField and Textarea */}
+          {/* Textarea */}
           <FormField
             control={form.control}
             name="message"
             render={({ field }) => (
-              <FormItem className="flex-grow !border-none">
-                <FormControl className="!border-none">
+              <FormItem className="flex-1">
+                <FormControl>
                   <TextareaAutosize
                     {...field}
                     maxRows={5}
-                    placeholder="Ask your AI Coach..."
-                    className="w-full resize-none bg-transparent border-none p-2 outline-none ring-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+                    placeholder="Message Progresso..."
+                    className="w-full resize-none bg-transparent border-none p-2 text-white placeholder:text-gray-500 outline-none ring-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
@@ -68,9 +67,19 @@ export function ChatInput({ onSubmit }: ChatInputProps) {
             )}
           />
 
-          {/* The seamless Ghost Button */}
-          <Button type="submit" size="icon" variant="ghost" disabled={!messageValue}>
-            <Send className={cn('w-5 h-5 text-accent transition-opacity', messageValue ? 'opacity-100' : 'opacity-50')} />
+          {/* Send Button */}
+          <Button 
+            type="submit" 
+            size="icon" 
+            disabled={!messageValue}
+            className={cn(
+              "rounded-full h-8 w-8 flex-shrink-0 transition-all",
+              messageValue 
+                ? "bg-accent hover:bg-accent/90 text-black" 
+                : "bg-gray-700 text-gray-500 cursor-not-allowed"
+            )}
+          >
+            <ArrowUp className="w-4 h-4" />
           </Button>
 
         </div>

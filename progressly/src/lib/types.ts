@@ -44,6 +44,8 @@ export interface PieChartData {
 }
 
 export interface DashboardBootstrapData {
+  // Note: Despite the name, this field now contains ALL activities (unlimited retention)
+  // The name is kept for backward compatibility
   activities_last_3_days: ActivityReadWithCategory[];
   pie_chart_data: PieChartData[];
   last_end_time: string | null;

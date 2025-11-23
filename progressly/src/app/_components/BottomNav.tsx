@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, MessageCircle, Target } from "lucide-react";
+import { LayoutDashboard, MessageCircle, Target, User } from "lucide-react";
 
 const navLinks = [
   {
@@ -20,13 +20,18 @@ const navLinks = [
     label: "Chat",
     icon: MessageCircle,
   },
+  {
+    href: "/account",
+    label: "Account",
+    icon: User,
+  },
 ];
 
 export default function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed bottom-0 w-full bg-primary border-t md:hidden">
+    <nav className="fixed bottom-0 w-full bg-black border-t border-gray-800 md:hidden z-50">
       <div className="flex justify-around items-center h-16">
         {navLinks.map((link) => {
           const isActive = pathname.startsWith(link.href);

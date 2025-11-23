@@ -38,14 +38,7 @@ import {
 } from '@/components/ui/popover';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Category } from '@/lib/types'; // Import Category from shared types
-
-// Define DailyTarget locally since it's not in shared types
-export type DailyTarget = {
-  id: number;
-  user_id: string;
-  category_name: string;
-  target_hours: number;
-};
+import { updateDailyTarget } from '../actions';
 import { useSupabaseClient } from '@supabase/auth-helpers-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -132,19 +125,11 @@ export function EditTargetModal({
     }
   }, [target, form]);
 
+
+
   const handleSubmit = async (values: FormValues) => {
     setIsSubmitting(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast({
-          title: 'Error',
-          description: 'You must be logged in to update targets.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
       // Convert targetValue and targetUnit to target_hours
       let finalTargetHours: number;
       if (values.target_unit === 'minutes') {
@@ -153,37 +138,22 @@ export function EditTargetModal({
         finalTargetHours = values.target_value ?? 1;
       }
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/targets/${target.id}`,
-        {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            category_name: values.category_name,
-            target_hours: finalTargetHours,
-          }),
-        }
-      );
+      const result = await updateDailyTarget(target.id, values.category_name, finalTargetHours);
 
-      if (!response.ok) {
-        const errorInfo = await response.json();
-        const errorStatus = response.status;
-        throw new CustomAPIError('Failed to update target', errorInfo, errorStatus);
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to update target');
       }
 
       toast({
         title: 'Success',
         description: 'Daily target updated successfully!',
       });
-      onSuccess(); // Trigger re-fetch and close modal
+      onSuccess(); // Trigger re-fetch (if needed) and close modal
     } catch (error) {
       console.error('Error updating target:', error);
       toast({
         title: 'Error',
-        description: error instanceof Error ? error.message : `Failed to update target: ${JSON.stringify(error)}`,
+        description: error instanceof Error ? error.message : 'Failed to update target',
         variant: 'destructive',
       });
     } finally {

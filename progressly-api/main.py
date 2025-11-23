@@ -32,6 +32,8 @@ class PieChartData(SQLModel):
     color: str
 
 class DashboardBootstrapResponse(SQLModel):
+    # Note: Despite the name, this field now contains ALL activities (unlimited retention)
+    # The name is kept for backward compatibility with existing frontend code
     activities_last_3_days: list[ActivityReadWithCategory]
     pie_chart_data: list[PieChartData]
     last_end_time: Optional[time]
@@ -88,6 +90,18 @@ def health_check_head():
     return
 
 # The endpoint definitions below are now cleaner as they use the imported dependencies
+# === User Endpoints ===
+@app.get("/api/user/onboarding-status")
+def get_onboarding_status(db: DBSession, user_id: str = Depends(get_current_user)):
+    """Check if the user has completed onboarding (has at least one goal)."""
+    try:
+        statement = select(Goal).where(Goal.user_id == user_id)
+        result = db.exec(statement).first()
+        return {"has_completed_onboarding": result is not None}
+    except Exception as e:
+        print(f"ERROR in get_onboarding_status: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to check onboarding status.")
+
 # === Goals Endpoints ===
 @app.post("/api/goals", response_model=Goal)
 def create_goal(goal_data: GoalCreate, db: DBSession, user_id: str = Depends(get_current_user)):
@@ -120,20 +134,37 @@ def create_daily_target(
     db: DBSession,
     user_id: str = Depends(get_current_user)
 ):
-    """Create a new daily time target for a category."""
+    """Create or update a daily time target for a category."""
     try:
-        new_target = DailyTarget(
-            user_id=user_id,
-            category_name=target_data["category_name"],
-            target_hours=target_data["target_hours"]
+        # Check if target already exists for this category
+        statement = select(DailyTarget).where(
+            DailyTarget.user_id == user_id,
+            DailyTarget.category_name == target_data["category_name"]
         )
-        db.add(new_target)
-        db.commit()
-        db.refresh(new_target)
-        return new_target
+        existing_target = db.exec(statement).first()
+
+        if existing_target:
+            # Update existing target
+            existing_target.target_hours = target_data["target_hours"]
+            db.add(existing_target)
+            db.commit()
+            db.refresh(existing_target)
+            return existing_target
+        else:
+            # Create new target
+            new_target = DailyTarget(
+                user_id=user_id,
+                category_name=target_data["category_name"],
+                target_hours=target_data["target_hours"]
+            )
+            db.add(new_target)
+            db.commit()
+            db.refresh(new_target)
+            return new_target
+
     except Exception as e:
         print(f"ERROR in create_daily_target: {type(e).__name__}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to create daily target.")
+        raise HTTPException(status_code=500, detail="Failed to create/update daily target.")
 
 @app.get("/api/targets/", response_model=list[DailyTarget])
 @app.get("/api/targets", response_model=list[DailyTarget])
@@ -146,6 +177,37 @@ def get_daily_targets(db: DBSession, user_id: str = Depends(get_current_user)):
     except Exception as e:
         print(f"ERROR in get_daily_targets: {type(e).__name__}: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch daily targets.")
+
+@app.put("/api/targets/{target_id}", response_model=DailyTarget)
+def update_daily_target(
+    target_id: int,
+    target_data: dict,
+    db: DBSession,
+    user_id: str = Depends(get_current_user)
+):
+    """Update a daily target."""
+    try:
+        target = db.exec(
+            select(DailyTarget)
+            .where(DailyTarget.id == target_id)
+            .where(DailyTarget.user_id == user_id)
+        ).first()
+        
+        if not target:
+            raise HTTPException(status_code=404, detail="Target not found.")
+        
+        target.category_name = target_data["category_name"]
+        target.target_hours = target_data["target_hours"]
+        
+        db.add(target)
+        db.commit()
+        db.refresh(target)
+        return target
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"ERROR in update_daily_target: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update daily target.")
 
 @app.delete("/api/targets/{target_id}")
 def delete_daily_target(
@@ -395,20 +457,21 @@ def get_dashboard_bootstrap(db: DBSession, user_id: str = Depends(get_current_us
     """
     try:
         today = date.today()
-        three_days_ago = today - timedelta(days=2)
 
-        # 1. Fetch Activities from the last 3 days with eager loading to prevent N+1 queries
+        # 1. Fetch ALL Activities with eager loading to prevent N+1 queries
+        # Changed from 3-day limit to unlimited retention - all activities are now kept
         activities_statement = (
             select(LoggedActivity)
             .options(selectinload(LoggedActivity.category_rel))  # Eager load categories
             .where(LoggedActivity.user_id == user_id)
-            .where(LoggedActivity.activity_date >= three_days_ago)
             .order_by(LoggedActivity.activity_date.asc(), LoggedActivity.start_time.asc())
         )
-        activities_last_3_days_raw = db.exec(activities_statement).all()
+        all_activities_raw = db.exec(activities_statement).all()
 
+        # Note: Variable name kept as activities_last_3_days for API response compatibility
+        # but it now contains ALL activities (unlimited retention)
         activities_last_3_days = []
-        for a in activities_last_3_days_raw:
+        for a in all_activities_raw:
             category_obj = None
             if a.category_rel:
                 category_obj = {

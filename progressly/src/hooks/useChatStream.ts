@@ -61,6 +61,9 @@ export const useChatStream = ({ messages, setMessages }: UseChatStreamProps): Us
     const updatedMessages = [...messages, userMessageObj, aiPlaceholder];
     setMessages(updatedMessages);
 
+    // Store timeout reference for cleanup (declared outside try for proper scoping)
+    let typingTimeout: NodeJS.Timeout | null = null;
+
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/chat`, {
         method: 'POST',
@@ -89,6 +92,49 @@ export const useChatStream = ({ messages, setMessages }: UseChatStreamProps): Us
       const decoder = new TextDecoder();
       let done = false;
       let firstChunkReceived = false;
+      
+      // Buffer for accumulating chunks before character-by-character typing
+      let chunkBuffer = '';
+      let displayedContent = '';
+      let isTyping = false;
+      
+      // Typing animation configuration
+      const TYPING_DELAY = 20; // milliseconds per character (adjust for speed - lower = faster)
+      const BATCH_SIZE = 1; // Characters to type at once (1 = true character-by-character)
+
+      // Function to type characters one by one
+      const typeCharacter = () => {
+        if (chunkBuffer.length === 0) {
+          isTyping = false;
+          typingTimeout = null;
+          return;
+        }
+        
+        // Take characters from buffer
+        const charsToType = chunkBuffer.slice(0, BATCH_SIZE);
+        chunkBuffer = chunkBuffer.slice(BATCH_SIZE);
+        displayedContent += charsToType;
+        
+        // Update the message with the new characters
+        setMessages((prevMessages) => {
+          const lastMessage = prevMessages[prevMessages.length - 1];
+          if (lastMessage && lastMessage.id === aiPlaceholderId) {
+            return [
+              ...prevMessages.slice(0, -1),
+              { ...lastMessage, content: displayedContent },
+            ];
+          }
+          return prevMessages;
+        });
+        
+        // Continue typing if there's more in the buffer
+        if (chunkBuffer.length > 0) {
+          typingTimeout = setTimeout(typeCharacter, TYPING_DELAY);
+        } else {
+          isTyping = false;
+          typingTimeout = null;
+        }
+      };
 
       // Step 3: Process stream chunks
       while (!done) {
@@ -112,20 +158,67 @@ export const useChatStream = ({ messages, setMessages }: UseChatStreamProps): Us
             firstChunkReceived = true;
           }
           
-          // Append chunk to the AI placeholder message
+          // Add chunk to buffer
+          chunkBuffer += chunk;
+          
+          // Start typing animation if not already running
+          if (!isTyping && chunkBuffer.length > 0) {
+            isTyping = true;
+            typeCharacter();
+          }
+        }
+      }
+      
+      // After stream is done, finish typing any remaining characters in buffer
+      // Use a recursive function to handle the remaining buffer
+      const finishTyping = () => {
+        if (chunkBuffer.length > 0) {
+          const charsToType = chunkBuffer.slice(0, BATCH_SIZE);
+          chunkBuffer = chunkBuffer.slice(BATCH_SIZE);
+          displayedContent += charsToType;
+          
           setMessages((prevMessages) => {
             const lastMessage = prevMessages[prevMessages.length - 1];
             if (lastMessage && lastMessage.id === aiPlaceholderId) {
               return [
                 ...prevMessages.slice(0, -1),
-                { ...lastMessage, content: lastMessage.content + chunk },
+                { ...lastMessage, content: displayedContent },
               ];
             }
             return prevMessages;
           });
+          
+          if (chunkBuffer.length > 0) {
+            typingTimeout = setTimeout(finishTyping, TYPING_DELAY);
+          } else {
+            isTyping = false;
+            typingTimeout = null;
+          }
+        } else {
+          isTyping = false;
+          typingTimeout = null;
         }
+      };
+      
+      // Start finishing the remaining buffer if there's any
+      if (chunkBuffer.length > 0 && !isTyping) {
+        isTyping = true;
+        finishTyping();
+      }
+      
+      // Wait for typing to complete (with a reasonable timeout)
+      const maxWaitTime = 30000; // 30 seconds max
+      const startWaitTime = Date.now();
+      while (isTyping && (Date.now() - startWaitTime) < maxWaitTime) {
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
     } catch (err) {
+      // Clear any pending typing timeout
+      if (typingTimeout) {
+        clearTimeout(typingTimeout);
+        typingTimeout = null;
+      }
+      
       setError(err instanceof Error ? err : new Error('An unknown error occurred.'));
       
       // Remove the AI placeholder on error
@@ -133,6 +226,10 @@ export const useChatStream = ({ messages, setMessages }: UseChatStreamProps): Us
         prevMessages.filter(m => m.id !== aiPlaceholderId)
       );
     } finally {
+      // Clear any pending timeout
+      if (typingTimeout) {
+        clearTimeout(typingTimeout);
+      }
       setIsStreaming(false);
       setIsAiThinking(false);
     }

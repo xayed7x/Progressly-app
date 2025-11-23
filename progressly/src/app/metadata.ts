@@ -48,11 +48,11 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: "https://progressly-app.vercel.app",
     title: "Progressly - Track Your 24 Hours & Achieve Your Goals",
-    description: "Progressly helps achievers track their 24 hours, plan better, and progress toward their goals. The AI-powered productivity app for time tracking and daily planning.",
+    description: "Check your time and reach your goals. Progressly helps you track your 24 hours, plan better, and make progress toward your goals with AI-powered insights.",
     siteName: "Progressly",
     images: [
       {
-        url: "/og-image.png", // TODO: Create this image (1200x630px recommended)
+        url: "/images/logo.png",
         width: 1200,
         height: 630,
         alt: "Progressly - Track Your 24 Hours & Achieve Your Goals",
@@ -64,10 +64,10 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Progressly - Track Your 24 Hours & Achieve Your Goals",
-    description: "Progressly helps achievers track their 24 hours, plan better, and progress toward their goals. The AI-powered productivity app for time tracking and daily planning.",
-    images: ["/og-image.png"], // TODO: Create this image (same as OG image)
-    creator: "@xayed007", // TODO: Update with actual Twitter handle
-    site: "@xayed007", // TODO: Update with actual Twitter handle
+    description: "Check your time and reach your goals. Progressly helps you track your 24 hours, plan better, and make progress toward your goals with AI-powered insights.",
+    images: ["/images/logo.png"],
+    creator: "@xayed007",
+    site: "@xayed007",
   },
 
   // PWA and Mobile App Meta Tags

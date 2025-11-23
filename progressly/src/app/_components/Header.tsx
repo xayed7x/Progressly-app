@@ -38,6 +38,7 @@ export default function Header() {
                         alt="Progressly Logo"
                         width={50}
                         height={32}
+                        suppressHydrationWarning
                       />        </Link>
 
         {/* Navigation Links - Hidden on mobile, shown on desktop */}

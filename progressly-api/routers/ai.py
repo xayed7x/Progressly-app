@@ -41,42 +41,50 @@ class ChatHistoryResponse(BaseModel):
 # --- Helper Functions ---
 def format_activities_for_prompt(activities: List[LoggedActivity]) -> str:
     """
-    Formats a list of LoggedActivity objects from the last 3 days into a human-readable string for the AI prompt.
-    Groups activities by day (Today, Yesterday, Two Days Ago).
+    Formats a list of LoggedActivity objects from the last 30 days into a human-readable string for the AI prompt.
+    Groups activities by day (Today, Yesterday, and older days).
     """
     if not activities:
-        return "The user has not logged any activities in the last three days."
+        return "The user has not logged any activities in the last 30 days."
     
     # Get today's date for comparison
     today = datetime.now().date()
-    yesterday = today - timedelta(days=1)
-    two_days_ago = today - timedelta(days=2)
     
-    # Group activities by day
-    activities_by_day = {
-        "Today": [],
-        "Yesterday": [],
-        "Two Days Ago": []
-    }
+    # Group activities by day - show Today, Yesterday, and last 7 days individually, then weekly
+    activities_by_day = {}
     
     for activity in activities:
-        # Extract the date from activity_date (which is a datetime)
+        # Extract the date from activity_date
         activity_date = activity.activity_date.date()
+        days_ago = (today - activity_date).days
         
-        # Format start time (e.g., "02:30 PM")
+        # Determine the label for this day
+        if days_ago == 0:
+            day_label = "Today"
+        elif days_ago == 1:
+            day_label = "Yesterday"
+        elif days_ago <= 7:
+            day_label = f"{activity_date.strftime('%A, %B %d')}"
+        else:
+            # Group older activities by week
+            week_start = activity_date - timedelta(days=activity_date.weekday())
+            day_label = f"Week of {week_start.strftime('%B %d')}"
+        
+        if day_label not in activities_by_day:
+            activities_by_day[day_label] = []
+        
+        # Format start time
         start_time_str = activity.start_time.strftime("%I:%M %p")
         
-        # Safely get category name from the relationship, with a fallback
+        # Get category name
         category_name = activity.category_rel.name if activity.category_rel else "Uncategorized"
         
-        # Calculate duration if both start and end times are present
+        # Calculate duration
         duration_str = ""
         if activity.start_time and activity.end_time:
-            # Convert time objects to datetime for calculation
             start_dt = datetime.combine(datetime.today().date(), activity.start_time)
             end_dt = datetime.combine(datetime.today().date(), activity.end_time)
             
-            # Handle activities that cross midnight
             if end_dt < start_dt:
                 end_dt += timedelta(days=1)
             
@@ -86,31 +94,19 @@ def format_activities_for_prompt(activities: List[LoggedActivity]) -> str:
             if duration_minutes >= 60:
                 hours = duration_minutes // 60
                 minutes = duration_minutes % 60
-                duration_str = f" (Duration: {hours}h {minutes}min)"
+                duration_str = f" ({hours}h {minutes}min)" if minutes > 0 else f" ({hours}h)"
             else:
-                duration_str = f" (Duration: {duration_minutes}min)"
+                duration_str = f" ({duration_minutes}min)"
         
-        # Build the formatted line
-        formatted_line = f"- {activity.activity_name} [{category_name}] at {start_time_str}{duration_str}"
-        
-        # Append to the correct day's list
-        if activity_date == today:
-            activities_by_day["Today"].append(formatted_line)
-        elif activity_date == yesterday:
-            activities_by_day["Yesterday"].append(formatted_line)
-        elif activity_date == two_days_ago:
-            activities_by_day["Two Days Ago"].append(formatted_line)
+        # Build formatted line
+        formatted_line = f"• {activity.activity_name} [{category_name}] at {start_time_str}{duration_str}"
+        activities_by_day[day_label].append(formatted_line)
     
-    # Build the final formatted string with day headers
+    # Build final formatted string
     result_sections = []
-    
-    for day_label in ["Today", "Yesterday", "Two Days Ago"]:
-        day_activities = activities_by_day[day_label]
-        if day_activities:
-            section = f"--- {day_label}'s Activities ---\n" + "\n".join(day_activities)
-            result_sections.append(section)
-        else:
-            result_sections.append(f"--- {day_label}'s Activities ---\nNo activities logged.")
+    for day_label, day_activities in activities_by_day.items():
+        section = f"**{day_label}**\n" + "\n".join(day_activities)
+        result_sections.append(section)
     
     return "\n\n".join(result_sections)
 
@@ -123,8 +119,7 @@ def format_goals_for_prompt(goals: List[Goal]) -> str:
     
     goal_lines = []
     for goal in goals:
-        status_emoji = "✅" if goal.completed else "🎯"
-        goal_lines.append(f"{status_emoji} {goal.title}")
+        goal_lines.append(f"🎯 {goal.content}")
     
     return "--- USER'S GOALS ---\n" + "\n".join(goal_lines)
 
@@ -156,9 +151,10 @@ async def stream_generator(
     """
     full_ai_response_content = ""
     try:
-        # --- New System Prompt ---
+        # --- Enhanced System Prompt ---
         system_prompt = """
 SYSTEM PROMPT: Your Identity and Rules
+
 1. Your Persona:
 Your name is Progresso.
 You are a supportive, encouraging, and insightful personal productivity coach.
@@ -175,15 +171,41 @@ You have access to the user's logged activities, goals, and daily time allocatio
 - Sum up all durations for activities in the same category to get total time spent
 - Be PRECISE with your calculations - show your math when asked about hours worked
 
-3. Your Output Formatting:
-You MUST format all of your responses using Markdown.
-You MUST use lists, bold text (**word**), and italics (*word*) to make your insights clear and easy to read.
-You MUST tastefully use emojis to add encouragement and visual appeal. Focus on these themes: 🌱 (growth), 🎯 (focus), 💪 (achievement), ✨ (insights), 🤔 (reflection), ⏰ (time management).
+3. Response Style (CRITICAL):
+CONCISENESS: By default, keep responses SHORT and CONCISE (2-4 sentences max)
+- For simple questions like "How's my day?" → Give a brief summary with 1-2 key insights
+- For detailed requests like "Give me a detailed summary" → Provide comprehensive analysis
+- ALWAYS ask if they want more details after a concise response
 
-4. Your Behavioral Guardrails (Non-Negotiable):
-Subject Matter: You MUST refuse to answer any questions that are not directly related to the user's productivity, time management, goal setting, or the activity/goal data provided. If asked about general knowledge, history, trivia, science, etc., you MUST politely decline and steer the conversation back to their progress.
-Identity: You MUST NOT reveal that you are a language model, an AI, or that you were trained by Google. You are Progresso, a personal coach.
-Creator Inquiry: If a user asks who created you or who you are, you MUST respond with the exact phrase: "I was created by Zayed bin Hamid, a passionate developer focused on helping people achieve their goals."
+FORMATTING RULES (MANDATORY):
+- Use short paragraphs (1-3 sentences each)
+- Add blank lines between paragraphs for readability
+- Use bullet points for lists (with • symbol)
+- Use emojis sparingly (1-2 per response max)
+- Break long responses into digestible chunks
+- Use **bold** for key metrics and important points
+
+STRUCTURE:
+For quick questions:
+• One-line summary
+• 1-2 key insights
+• Ask if they want details
+
+For detailed requests:
+• Brief overview
+• Detailed breakdown by category
+• Specific recommendations
+• Encouraging conclusion
+
+4. Your Output Formatting:
+You MUST format all of your responses using Markdown.
+Use lists, bold text (**word**), and line breaks to make insights clear and scannable.
+Emojis to use (sparingly): 🌱 (growth), 🎯 (focus), 💪 (achievement), ✨ (insights), 🤔 (reflection), ⏰ (time)
+
+5. Your Behavioral Guardrails (Non-Negotiable):
+Subject Matter: You MUST refuse to answer any questions that are not directly related to the user's productivity, time management, goal setting, or the activity/goal data provided. If asked about general knowledge, politely decline and steer back to their progress.
+Identity: You MUST NOT reveal that you are a language model or AI. You are Progresso, a personal coach.
+Creator Inquiry: If asked who created you, respond: "I was created by Zayed bin Hamid, a passionate developer focused on helping people achieve their goals."
 """
         
         # Extract the user's most recent message
@@ -198,7 +220,7 @@ Creator Inquiry: If a user asks who created you or who you are, you MUST respond
         # Construct the final prompt for the model
         meta_prompt = (
             f"{system_prompt}\n\n"
-            f"--- USER'S ACTIVITY DATA (LAST 3 DAYS) ---\n"
+            f"--- USER'S ACTIVITY DATA (LAST 30 DAYS) ---\n"
             f"{activities_context}\n\n"
             f"{goals_context}\n\n"
             f"{targets_context}\n\n"
@@ -348,7 +370,7 @@ async def stream_chat(
         # Step 2: Fetch context data in a separate, read-only transaction
         with get_db_session() as db:
             now = datetime.utcnow()
-            three_days_ago_datetime = now - timedelta(days=3)
+            thirty_days_ago = now - timedelta(days=30)
             
             # Fetch activities with eager loading to prevent N+1 queries
             activities = db.exec(
@@ -356,7 +378,7 @@ async def stream_chat(
                 .options(selectinload(LoggedActivity.category_rel))
                 .where(
                     LoggedActivity.user_id == user_id,
-                    LoggedActivity.activity_date >= three_days_ago_datetime
+                    LoggedActivity.activity_date >= thirty_days_ago
                 )
             ).all()
             

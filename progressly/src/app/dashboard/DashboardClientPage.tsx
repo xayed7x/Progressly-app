@@ -48,6 +48,7 @@ export default function DashboardClientPage({
 }) {
   const supabase = getSupabaseBrowserClient();
   const [user, setUser] = useState<User | null>(null);
+  const [isUserLoading, setIsUserLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [optimisticActivities, setOptimisticActivities] = useState<
     ActivityReadWithCategory[]
@@ -55,8 +56,10 @@ export default function DashboardClientPage({
 
   useEffect(() => {
     const initializeUser = async () => {
+      setIsUserLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
+      setIsUserLoading(false);
 
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.access_token) {
@@ -73,6 +76,7 @@ export default function DashboardClientPage({
         }
         const { data: { user } } = await supabase.auth.getUser();
         setUser(user);
+        setIsUserLoading(false);
       }
     );
 
@@ -176,10 +180,10 @@ export default function DashboardClientPage({
 
   // Calculate disabled states for navigation
   const today = new Date();
-  const dayBeforeYesterday = subDays(today, 2);
 
   const isNextDisabled = isToday(selectedDate);
-  const isPreviousDisabled = selectedDate.toDateString() === dayBeforeYesterday.toDateString();
+  // Removed 3-day limit - users can now navigate back unlimited to view all historical activities
+  const isPreviousDisabled = false;
 
   // Add optimistic activity function
   const addOptimisticActivity = (activity: ActivityReadWithCategory) => {
@@ -226,57 +230,69 @@ export default function DashboardClientPage({
     }
   };
 
-  const displayName = user?.user_metadata?.full_name || user?.email || 'Achiever';
+  // Wait for user to load before showing fallback
+  const displayName = isUserLoading 
+    ? 'Achiever' // Show default while loading
+    : (user?.user_metadata?.full_name || user?.email || 'Achiever');
 
   return (
-    <main className="container mx-auto px-4 py-8">
-      <div className="flex flex-col items-center justify-center gap-y-8">
-        <h1 className="text-center text-3xl font-bold text-secondary">
-          Welcome back, {displayName.split(' ')[0]}!
-        </h1>
+    <main className="min-h-screen bg-black text-white relative overflow-hidden">
+      {/* Background Elements */}
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-accent/20 rounded-full blur-[100px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/20 rounded-full blur-[100px]" />
+      </div>
 
-        <ActivityLogger
-          categories={sortedCategories}
-          lastEndTime={bootstrapData?.last_end_time?.substring(0, 5) ?? undefined}
-          onActivityLogged={handleActivityLogged} // Use the new handler
-          addOptimisticActivity={addOptimisticActivity}
-          selectedDate={selectedDate} // Pass down selectedDate
-        />
+      <div className="container mx-auto px-4 py-8 relative z-10">
+        <div className="flex flex-col items-center justify-center gap-y-8">
+          {/* Welcome Message */}
+          <h1 className="text-4xl font-bold text-center bg-gradient-to-r from-accent to-blue-500 bg-clip-text text-transparent">
+            Welcome back, {displayName.split(' ')[0]}!
+          </h1>
 
-        <DaySelector
-          selectedDate={selectedDate}
-          onPreviousClick={handleGoToPreviousDay}
-          onNextClick={handleGoToNextDay}
-          isPreviousDisabled={isPreviousDisabled}
-          isNextDisabled={isNextDisabled}
-        />
-
-        <div className="w-full max-w-lg bg-secondary/40 p-4 rounded-lg">
-          <ActivitiesWrapper
-            activities={activitiesForSelectedDate}
-            optimisticActivities={optimisticActivities}
-            isLoading={isLoadingBootstrap}
-            selectedDate={selectedDate}
-            onActivityUpdated={mutateBootstrap}
+          <ActivityLogger
+            categories={sortedCategories}
+            lastEndTime={bootstrapData?.last_end_time?.substring(0, 5) ?? undefined}
+            onActivityLogged={handleActivityLogged} // Use the new handler
+            addOptimisticActivity={addOptimisticActivity}
+            selectedDate={selectedDate} // Pass down selectedDate
           />
-        </div>
 
-        <div className="mt-12 w-full max-w-2xl">
-          {isLoadingBootstrap ? (
-            <ChartSkeleton />
-          ) : (
-            <DailySummaryChart
+          <DaySelector
+            selectedDate={selectedDate}
+            onPreviousClick={handleGoToPreviousDay}
+            onNextClick={handleGoToNextDay}
+            isPreviousDisabled={isPreviousDisabled}
+            isNextDisabled={isNextDisabled}
+          />
+
+          <div className="w-full max-w-lg bg-secondary/40 p-4 rounded-lg">
+            <ActivitiesWrapper
+              activities={activitiesForSelectedDate}
+              optimisticActivities={optimisticActivities}
+              isLoading={isLoadingBootstrap}
               selectedDate={selectedDate}
-              data={pieChartDataForSelectedDate}
+              onActivityUpdated={mutateBootstrap}
             />
-          )}
-        </div>
+          </div>
 
-        {/* Goal Manager section - hidden for now
-        <div className="mt-8">
-          {goalManager}
+          <div className="mt-12 w-full max-w-2xl">
+            {isLoadingBootstrap ? (
+              <ChartSkeleton />
+            ) : (
+              <DailySummaryChart
+                selectedDate={selectedDate}
+                data={pieChartDataForSelectedDate}
+              />
+            )}
+          </div>
+
+          {/* Goal Manager section - hidden for now
+          <div className="mt-8">
+            {goalManager}
+          </div>
+          */}
         </div>
-        */}
       </div>
     </main>
   );

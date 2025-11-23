@@ -67,6 +67,7 @@ export default function CategorySelect({
       </SelectTrigger>
       <SelectContent>
         <div className="max-h-[240px] overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-accent1 scrollbar-track-secondary/50">
+          {/* Show user's existing categories */}
           {categories.map((category) => {
             const Icon = getCategoryIcon(category.name);
             return (
@@ -85,25 +86,36 @@ export default function CategorySelect({
             );
           })}
 
-          {categories.length === 0 && (
-            <>
-              <SelectSeparator />
-              {defaultActivityCategories.map((label: string) => {
-                const Icon = getCategoryIcon(label);
-                return (
-                  <SelectItem key={label} value={`__default__:${label}`}>
-                    <div className="flex items-center gap-2">
-                      <Icon
-                        className="w-4 h-4"
-                        style={{ color: defaultCategoryHexColors[label] || "#808080" }}
-                      />
-                      {label}
-                    </div>
-                  </SelectItem>
-                );
-              })}
-            </>
-          )}
+          {/* Show default categories that the user hasn't created yet */}
+          {(() => {
+            const existingCategoryNames = new Set(categories.map(cat => cat.name));
+            const missingDefaults = defaultActivityCategories.filter(
+              label => !existingCategoryNames.has(label)
+            );
+            
+            if (missingDefaults.length > 0) {
+              return (
+                <>
+                  {categories.length > 0 && <SelectSeparator />}
+                  {missingDefaults.map((label: string) => {
+                    const Icon = getCategoryIcon(label);
+                    return (
+                      <SelectItem key={label} value={`__default__:${label}`}>
+                        <div className="flex items-center gap-2">
+                          <Icon
+                            className="w-4 h-4"
+                            style={{ color: defaultCategoryHexColors[label] || "#808080" }}
+                          />
+                          {label}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </>
+              );
+            }
+            return null;
+          })()}
         </div>
 
         <SelectSeparator />

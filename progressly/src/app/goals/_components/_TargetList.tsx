@@ -22,7 +22,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-// import { EditTargetModal } from './EditTargetModal'; // Commented out as goals section is disabled
+import { EditTargetModal } from './_EditTargetModal';
 import { Category } from '@/lib/types'; // Import Category from shared types
 
 // Define DailyTarget locally since it's not in shared types
@@ -142,17 +142,16 @@ export function TargetList({ targets, onDelete, mutateTargets, categories }: Tar
   </TableBody>
 </Table>
       {selectedTarget && (
-        // <EditTargetModal
-        //   isOpen={isEditModalOpen}
-        //   onClose={handleCloseEditModal}
-        //   target={selectedTarget}
-        //   onSuccess={() => {
-        //     mutateTargets(); 
-        //     handleCloseEditModal();
-        //   }}
-        //   categories={categories}
-        // />
-        null // Render nothing when EditTargetModal is commented out
+        <EditTargetModal
+          isOpen={isEditModalOpen}
+          onClose={handleCloseEditModal}
+          target={selectedTarget}
+          onSuccess={() => {
+            mutateTargets(); 
+            handleCloseEditModal();
+          }}
+          categories={categories}
+        />
       )}
     </div>
   );

@@ -53,53 +53,18 @@ def cleanup_old_activities(
     _: bool = Depends(verify_cleanup_token)
 ):
     """
-    Delete all logged activities that are older than 3 days.
+    DISABLED: Activity cleanup is no longer performed.
+    All activities are now retained indefinitely.
     
-    This endpoint is protected and requires a valid X-CLEANUP-TOKEN header.
-    It should be called by a trusted source like a scheduled job runner.
+    This endpoint is kept for backward compatibility but no longer deletes any data.
     
     Returns:
-        dict: Success message with the number of deleted records
+        dict: Success message indicating no cleanup was performed
     """
-    try:
-        # Calculate the cutoff date (4 days ago)
-        # This provides a safe look-back buffer for wake-up to wake-up logic
-        cutoff_date = date.today() - timedelta(days=4)
-        
-        # First, count how many records will be deleted for logging
-        count_statement = select(LoggedActivity).where(
-            LoggedActivity.activity_date < cutoff_date
-        )
-        records_to_delete = db.exec(count_statement).all()
-        count = len(records_to_delete)
-        
-        if count == 0:
-            return {
-                "success": True,
-                "message": "No activities older than 4 days found.",
-                "deleted_count": 0,
-                "cutoff_date": cutoff_date.isoformat()
-            }
-        
-        # Delete all activities older than 4 days
-        delete_statement = delete(LoggedActivity).where(
-            LoggedActivity.activity_date < cutoff_date
-        )
-        
-        result = db.exec(delete_statement)
-        db.commit()
-        
-        return {
-            "success": True,
-            "message": f"Successfully deleted {count} activities older than 4 days.",
-            "deleted_count": count,
-            "cutoff_date": cutoff_date.isoformat()
-        }
-        
-    except Exception as e:
-        # Rollback the transaction in case of error
-        db.rollback()
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to cleanup activities: {str(e)}"
-        )
+    # Activity cleanup has been disabled - all activities are now retained indefinitely
+    return {
+        "success": True,
+        "message": "Activity cleanup is disabled. All activities are retained indefinitely.",
+        "deleted_count": 0,
+        "note": "This endpoint is kept for backward compatibility but no longer deletes data."
+    }

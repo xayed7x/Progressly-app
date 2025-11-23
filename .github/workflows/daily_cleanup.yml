@@ -1,20 +1,25 @@
 # .github/workflows/daily_cleanup.yml
-name: Daily Activity Cleanup
+# DISABLED: Activity cleanup workflow is no longer needed
+# All activities are now retained indefinitely instead of being deleted after 3 days
+# This workflow is kept for reference but will not execute
+
+name: Daily Activity Cleanup (DISABLED)
 
 # This section defines the schedule.
-# It will run every day at 2:00 AM UTC.
-on:
-  schedule:
-    - cron: '0 2 * * *'
-  # Allows us to run this workflow manually from the Actions tab in GitHub
-  workflow_dispatch:
+# DISABLED: Schedule is commented out to prevent execution
+# on:
+#   schedule:
+#     - cron: '0 2 * * *'
+#   # Allows us to run this workflow manually from the Actions tab in GitHub
+#   workflow_dispatch:
 
 jobs:
   cleanup:
     runs-on: ubuntu-latest
     steps:
-      - name: Call the cleanup endpoint
+      - name: Cleanup endpoint disabled
         run: |
-          curl -X POST \
-          -H "X-CLEANUP-TOKEN: ${{ secrets.CLEANUP_SECRET_TOKEN }}" \
-          "https://progressly-api.onrender.com/api/jobs/cleanup-activities"
+          echo "Activity cleanup is disabled. All activities are now retained indefinitely."
+          # curl -X POST \
+          # -H "X-CLEANUP-TOKEN: ${{ secrets.CLEANUP_SECRET_TOKEN }}" \
+          # "https://progressly-api.onrender.com/api/jobs/cleanup-activities"
