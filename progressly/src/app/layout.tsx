@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { inter, playfair_display, roboto_mono } from "./fonts";
 import "./globals.css";
 import Providers from "./Providers";
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { SessionContextProvider } from '@supabase/auth-helpers-react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { Database } from '@/lib/types_db';
@@ -16,6 +16,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const [supabaseClient] = useState(() => createClientComponentClient<Database>());
+
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw-custom.js')
+          .then(registration => {
+            console.log('SW registered: ', registration);
+          })
+          .catch(registrationError => {
+            console.log('SW registration failed: ', registrationError);
+          });
+      });
+    }
+  }, []);
+
   return (
     <html
       lang="en"

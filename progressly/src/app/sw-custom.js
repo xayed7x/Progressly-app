@@ -1,3 +1,9 @@
+self.addEventListener('fetch', (event) => {
+  // This is a minimal fetch handler to meet Chrome's installability criteria.
+  // It doesn't perform any caching, just passes the request through.
+  event.respondWith(fetch(event.request));
+});
+
 self.addEventListener('sync', (event) => {
   if (event.tag === 'sync-queued-activities') {
     event.waitUntil(syncQueuedActivities());

@@ -4,7 +4,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import ResilientPwaButton from "./ResilientPwaButton";
 import { useSupabaseClient, useUser } from "@supabase/auth-helpers-react";
 
 const navLinks = [
@@ -65,8 +64,6 @@ export default function Header() {
         </nav>
 
         <div className="flex items-center gap-x-4">
-          <ResilientPwaButton />
-          
           {user ? (
             <Button variant="outline" onClick={handleLogout}>Logout</Button>
           ) : (

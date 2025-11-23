@@ -3,6 +3,7 @@
 import { Toaster } from "@/components/ui/toaster";
 import { PwaUpdater } from "@/components/PwaUpdater";
 import BottomNav from "./_components/BottomNav";
+import PwaInstallButton from "./_components/PwaInstallButton";
 
 import { usePathname } from "next/navigation";
 
@@ -16,6 +17,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
         <main className="flex-grow overflow-y-auto pb-16 md:pb-0">{children}</main>
         {!isHomePage && <BottomNav />}
       </div>
+      <PwaInstallButton />
       <PwaUpdater />
       <Toaster />
     </>
