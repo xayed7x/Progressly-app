@@ -6,7 +6,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:8
 
 async function checkOnboardingStatus(token: string): Promise<boolean> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/onboarding-status`, {
+    const response = await fetch(`${API_BASE_URL}/api/user/onboarding-status`, {
       headers: {
         'Authorization': `Bearer ${token}`,
       },
@@ -44,6 +44,8 @@ export async function middleware(req: NextRequest) {
     if (pathname === '/login' || pathname === '/') {
       const hasCompletedOnboarding = await checkOnboardingStatus(session.access_token);
       
+      // If user has completed onboarding (has goals), send to dashboard
+      // If user is new (no goals), send to onboarding
       if (hasCompletedOnboarding) {
         return NextResponse.redirect(new URL('/dashboard', req.url));
       } else {
@@ -64,15 +66,20 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
+  /*
+   * Match all page routes. This will exclude static assets like
+   * manifest.json, sw-custom.js, and images from the middleware.
+   */
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - images (image assets)
-     * - api (API routes)
-     */
-    '/((?!_next/static|_next/image|favicon.ico|images|api).*)',
-  ],
+    '/',
+    '/login',
+    '/dashboard/:path*',
+    '/onboarding',
+    '/account/:path*',
+    '/chat/:path*',
+    '/contact/:path*',
+    '/features/:path*',
+    '/goals/:path*',
+    '/auth/:path*',
+  ]
 }

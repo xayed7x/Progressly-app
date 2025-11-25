@@ -58,7 +58,10 @@ export default function RootLayout({
         <meta property="twitter:description" content="Check your time and reach your goals. Progressly helps you track your 24 hours, plan better, and make progress toward your goals with AI-powered insights." />
         <meta property="twitter:image" content="https://progressly-app.vercel.app/images/logo.png" />
         
-        <link rel="manifest" href="/manifest.json" />
+        <link id="my-manifest-link" rel="manifest" href="/manifest.json" />
+        <script>
+          console.log("Attempting to find manifest link element:", document.getElementById("my-manifest-link"));
+        </script>
         {/* Google Search Console Verification */}
         <meta name="google-site-verification" content="hWY_M3uBePeRTT9uESKKM-lIlLHCvF7-9tluj1sB_Jw" />
         {/* Structured Data for SEO */}
