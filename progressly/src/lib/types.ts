@@ -51,6 +51,7 @@ export interface DashboardBootstrapData {
   pie_chart_data: PieChartData[];
   last_end_time: string | null;
   categories: Category[];
+  effective_date: string;  // ISO date string for the user's current "day" based on wake-up logic
 }
 
 export interface DailyTarget {

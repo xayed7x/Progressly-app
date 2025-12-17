@@ -1,7 +1,7 @@
 'use client';
 
 import type { Metadata } from "next";
-import { inter, playfair_display, roboto_mono } from "./fonts";
+import { inter, instrumentSerif } from "./fonts";
 import "./globals.css";
 import Providers from "./Providers";
 import { useState, useEffect } from 'react';
@@ -34,7 +34,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`dark ${inter.variable} ${playfair_display.variable} ${roboto_mono.variable}`}
+      className={`dark ${inter.variable} ${instrumentSerif.variable}`}
       suppressHydrationWarning
     >
       <head>

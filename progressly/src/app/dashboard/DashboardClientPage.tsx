@@ -49,7 +49,7 @@ export default function DashboardClientPage({
   const supabase = getSupabaseBrowserClient();
   const [user, setUser] = useState<User | null>(null);
   const [isUserLoading, setIsUserLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);  // Initialize from effective_date
   const [optimisticActivities, setOptimisticActivities] = useState<
     ActivityReadWithCategory[]
   >([]);
@@ -110,6 +110,13 @@ export default function DashboardClientPage({
     fetcher
   );
 
+  // Initialize selectedDate from backend's effective_date (based on wake-up logic)
+  useEffect(() => {
+    if (bootstrapData?.effective_date && selectedDate === null) {
+      setSelectedDate(parseISO(bootstrapData.effective_date));
+    }
+  }, [bootstrapData?.effective_date, selectedDate]);
+
   const sortedCategories = useMemo(() => {
     if (!bootstrapData?.categories) return [];
 
@@ -139,7 +146,7 @@ export default function DashboardClientPage({
 
   // Memoize filtered activities for the selected date
   const activitiesForSelectedDate = useMemo(() => {
-    if (!bootstrapData) return [];
+    if (!bootstrapData || !selectedDate) return [];
     return bootstrapData.activities_last_3_days.filter(act => {
       // Safety check: ensure activity_date exists
       if (!act.activity_date) return false;
@@ -181,9 +188,9 @@ export default function DashboardClientPage({
   // Calculate disabled states for navigation
   const today = new Date();
 
-  const isNextDisabled = isToday(selectedDate);
+  const isNextDisabled = !selectedDate || isToday(selectedDate);
   // Removed 3-day limit - users can now navigate back unlimited to view all historical activities
-  const isPreviousDisabled = false;
+  const isPreviousDisabled = !selectedDate;
 
   // Add optimistic activity function
   const addOptimisticActivity = (activity: ActivityReadWithCategory) => {
@@ -194,14 +201,22 @@ export default function DashboardClientPage({
 
   // Navigation handlers
   const handleGoToPreviousDay = () => {
-    if (!isPreviousDisabled) {
+    if (!isPreviousDisabled && selectedDate) {
       setSelectedDate(subDays(selectedDate, 1));
     }
   };
 
   const handleGoToNextDay = () => {
-    if (!isNextDisabled) {
+    if (!isNextDisabled && selectedDate) {
       setSelectedDate(subDays(selectedDate, -1)); // Add one day (subtract negative)
+    }
+  };
+
+  // Manual day advancement - for when user forgets to log sleep
+  const handleEndDay = () => {
+    if (selectedDate) {
+      const nextDay = addDays(selectedDate, 1);
+      setSelectedDate(nextDay);
     }
   };
 
@@ -221,12 +236,37 @@ export default function DashboardClientPage({
       mutateBootstrap(undefined, { revalidate: true });
     }
 
-    // Check if the logged activity is 'Sleep'
-    if (newActivity.category?.name === 'Sleep') {
-      // Advance the date to the day after the sleep activity
-      const sleepDate = parseISO(newActivity.activity_date);
-      const nextDay = addDays(sleepDate, 1);
-      setSelectedDate(nextDay);
+    // Smart night sleep detection - only advance day for actual night sleep, not naps
+    if (newActivity.category?.name?.toLowerCase() === 'sleep') {
+      const endTimeStr = newActivity.end_time; // Format: "HH:mm:ss"
+      const startTimeStr = newActivity.start_time;
+      
+      // Parse end time hour
+      const endHour = parseInt(endTimeStr.split(':')[0], 10);
+      
+      // Calculate duration in hours
+      const startParts = startTimeStr.split(':').map(Number);
+      const endParts = endTimeStr.split(':').map(Number);
+      let startMinutes = startParts[0] * 60 + startParts[1];
+      let endMinutes = endParts[0] * 60 + endParts[1];
+      
+      // Handle overnight sleep (end time < start time)
+      if (endMinutes < startMinutes) {
+        endMinutes += 24 * 60; // Add 24 hours
+      }
+      const durationHours = (endMinutes - startMinutes) / 60;
+      
+      // Night sleep criteria:
+      // 1. Ends between 4 AM (4) and 12 PM (12)
+      // 2. Duration >= 2 hours
+      const isNightSleep = endHour >= 4 && endHour < 12 && durationHours >= 2;
+      
+      if (isNightSleep) {
+        // Advance the date to the day after the sleep activity
+        const sleepDate = parseISO(newActivity.activity_date);
+        const nextDay = addDays(sleepDate, 1);
+        setSelectedDate(nextDay);
+      }
     }
   };
 
@@ -250,42 +290,49 @@ export default function DashboardClientPage({
             Welcome back, {displayName.split(' ')[0]}!
           </h1>
 
-          <ActivityLogger
-            categories={sortedCategories}
-            lastEndTime={bootstrapData?.last_end_time?.substring(0, 5) ?? undefined}
-            onActivityLogged={handleActivityLogged} // Use the new handler
-            addOptimisticActivity={addOptimisticActivity}
-            selectedDate={selectedDate} // Pass down selectedDate
-          />
-
-          <DaySelector
-            selectedDate={selectedDate}
-            onPreviousClick={handleGoToPreviousDay}
-            onNextClick={handleGoToNextDay}
-            isPreviousDisabled={isPreviousDisabled}
-            isNextDisabled={isNextDisabled}
-          />
-
-          <div className="w-full max-w-lg bg-secondary/40 p-4 rounded-lg">
-            <ActivitiesWrapper
-              activities={activitiesForSelectedDate}
-              optimisticActivities={optimisticActivities}
-              isLoading={isLoadingBootstrap}
-              selectedDate={selectedDate}
-              onActivityUpdated={mutateBootstrap}
-            />
-          </div>
-
-          <div className="mt-12 w-full max-w-2xl">
-            {isLoadingBootstrap ? (
-              <ChartSkeleton />
-            ) : (
-              <DailySummaryChart
-                selectedDate={selectedDate}
-                data={pieChartDataForSelectedDate}
+          {selectedDate ? (
+            <>
+              <ActivityLogger
+                categories={sortedCategories}
+                lastEndTime={bootstrapData?.last_end_time?.substring(0, 5) ?? undefined}
+                onActivityLogged={handleActivityLogged} // Use the new handler
+                addOptimisticActivity={addOptimisticActivity}
+                selectedDate={selectedDate} // Pass down selectedDate
               />
-            )}
-          </div>
+
+              <DaySelector
+                selectedDate={selectedDate}
+                onPreviousClick={handleGoToPreviousDay}
+                onNextClick={handleGoToNextDay}
+                onEndDay={handleEndDay}
+                isPreviousDisabled={isPreviousDisabled}
+                isNextDisabled={isNextDisabled}
+              />
+
+              <div className="w-full max-w-lg bg-secondary/40 p-4 rounded-lg">
+                <ActivitiesWrapper
+                  activities={activitiesForSelectedDate}
+                  optimisticActivities={optimisticActivities}
+                  isLoading={isLoadingBootstrap}
+                  selectedDate={selectedDate}
+                  onActivityUpdated={mutateBootstrap}
+                />
+              </div>
+
+              <div className="mt-12 w-full max-w-2xl">
+                {isLoadingBootstrap ? (
+                  <ChartSkeleton />
+                ) : (
+                  <DailySummaryChart
+                    selectedDate={selectedDate}
+                    data={pieChartDataForSelectedDate}
+                  />
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="text-center text-white/60">Loading your day...</div>
+          )}
 
           {/* Goal Manager section - hidden for now
           <div className="mt-8">

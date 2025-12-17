@@ -30,9 +30,8 @@ const config = {
         "accent-foreground": "#0D0D0D",
       },
       fontFamily: {
-        sans: ["var(--font-inter)"],
-        serif: ["var(--font-playfair-display)"],
-        mono: ["var(--font-roboto-mono)"],
+        sans: ["var(--font-sans)"],
+        serif: ["var(--font-serif)"],
       },
       keyframes: {
         "accordion-down": {

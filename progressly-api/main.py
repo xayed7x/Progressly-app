@@ -38,6 +38,8 @@ class DashboardBootstrapResponse(SQLModel):
     pie_chart_data: list[PieChartData]
     last_end_time: Optional[time]
     categories: list[Category]
+    effective_date: date  # The "current day" based on wake-up logic
+
 
 
 def create_db_and_tables():
@@ -531,11 +533,50 @@ def get_dashboard_bootstrap(db: DBSession, user_id: str = Depends(get_current_us
         latest_activity = db.exec(latest_activity_statement).first()
         last_end_time = latest_activity.end_time if latest_activity else None
 
+        # 4. Calculate effective_date based on wake-up logic
+        # The effective date is "today" only if user has logged sleep that ends today
+        # Otherwise, it's "yesterday" (user is still in yesterday's day cycle)
+        effective_date = today
+        
+        # Find the user's Sleep category
+        sleep_category = db.exec(
+            select(Category)
+            .where(Category.user_id == user_id)
+            .where(Category.name.ilike("sleep"))
+        ).first()
+        
+        if sleep_category:
+            # Check if there's a sleep activity that started yesterday and ended today
+            yesterday = today - timedelta(days=1)
+            sleep_that_ended_today = False
+            
+            for activity in all_activities_raw:
+                if activity.category_id != sleep_category.id:
+                    continue
+                    
+                # Check if this is an overnight sleep that ended today
+                activity_start = datetime.combine(activity.activity_date, activity.start_time)
+                activity_end = datetime.combine(
+                    activity.activity_date + timedelta(days=1) if activity.end_time < activity.start_time 
+                    else activity.activity_date, 
+                    activity.end_time
+                )
+                
+                # If sleep started yesterday and ended today, user has woken up today
+                if activity_start.date() == yesterday and activity_end.date() == today:
+                    sleep_that_ended_today = True
+                    break
+            
+            # If no sleep ended today, user is still in yesterday's day cycle
+            if not sleep_that_ended_today:
+                effective_date = yesterday
+
         return DashboardBootstrapResponse(
             activities_last_3_days=activities_last_3_days,
             pie_chart_data=pie_chart_data,
             last_end_time=last_end_time,
             categories=user_categories,
+            effective_date=effective_date,
         )
     except Exception as e:
         print(f"ERROR in get_dashboard_bootstrap: {type(e).__name__}: {e}")
