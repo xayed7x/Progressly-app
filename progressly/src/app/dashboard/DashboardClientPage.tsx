@@ -111,8 +111,27 @@ export default function DashboardClientPage({
   );
 
   // Initialize selectedDate from backend's effective_date (based on wake-up logic)
+  // OR from localStorage if user manually ended their day
   useEffect(() => {
     if (bootstrapData?.effective_date && selectedDate === null) {
+      // Check if user manually ended their day (stored in localStorage)
+      const manualDayEnd = localStorage.getItem('progressly_manual_day_end');
+      if (manualDayEnd) {
+        const { date, endedAt } = JSON.parse(manualDayEnd);
+        // Only use the manual day end if it was set recently (within 24 hours)
+        const endedAtTime = new Date(endedAt).getTime();
+        const now = Date.now();
+        const hoursAgo = (now - endedAtTime) / (1000 * 60 * 60);
+        
+        if (hoursAgo < 24) {
+          setSelectedDate(parseISO(date));
+          return;
+        } else {
+          // Clear stale manual day end
+          localStorage.removeItem('progressly_manual_day_end');
+        }
+      }
+      // Default: use effective_date from backend
       setSelectedDate(parseISO(bootstrapData.effective_date));
     }
   }, [bootstrapData?.effective_date, selectedDate]);
@@ -217,17 +236,23 @@ export default function DashboardClientPage({
     if (selectedDate) {
       const nextDay = addDays(selectedDate, 1);
       setSelectedDate(nextDay);
+      // Save to localStorage so it persists on refresh
+      localStorage.setItem('progressly_manual_day_end', JSON.stringify({
+        date: nextDay.toISOString().split('T')[0],
+        endedAt: new Date().toISOString()
+      }));
     }
   };
 
   // New handler for when an activity is logged
   const handleActivityLogged = (newActivity: ActivityReadWithCategory) => {
-    // Optimistically update the cache with the new activity
+    // Optimistically update the cache with the new activity AND the last_end_time
     if (bootstrapData) {
       mutateBootstrap(
         {
           ...bootstrapData,
           activities_last_3_days: [...bootstrapData.activities_last_3_days, newActivity],
+          last_end_time: newActivity.end_time, // Update last_end_time for the form
         },
         { revalidate: true } // Then revalidate from server
       );
@@ -265,6 +290,8 @@ export default function DashboardClientPage({
         // Advance the date to the day after the sleep activity
         const sleepDate = parseISO(newActivity.activity_date);
         const nextDay = addDays(sleepDate, 1);
+        // Clear manual day end since sleep is now detected
+        localStorage.removeItem('progressly_manual_day_end');
         setSelectedDate(nextDay);
       }
     }
