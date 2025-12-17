@@ -106,35 +106,53 @@ export default function DashboardClientPage({
     isLoading: isLoadingBootstrap,
     mutate: mutateBootstrap,
   } = useSWR<DashboardBootstrapData>(
-    `${API_BASE_URL}/api/dashboard-bootstrap`,
-    fetcher
+    // Only fetch when user is loaded to avoid auth errors on refresh
+    user ? `${API_BASE_URL}/api/dashboard-bootstrap` : null,
+    fetcher,
+    {
+      revalidateOnFocus: true, // Refresh when window regains focus
+      revalidateOnReconnect: true, // Refresh when network reconnects
+    }
   );
 
-  // Initialize selectedDate from backend's effective_date (based on wake-up logic)
-  // OR from localStorage if user manually ended their day
+  // Track if we've already initialized from localStorage
+  const [dateInitialized, setDateInitialized] = useState(false);
+
+  // FIRST: Check localStorage on mount (runs once)
   useEffect(() => {
-    if (bootstrapData?.effective_date && selectedDate === null) {
-      // Check if user manually ended their day (stored in localStorage)
-      const manualDayEnd = localStorage.getItem('progressly_manual_day_end');
-      if (manualDayEnd) {
+    if (dateInitialized) return;
+    
+    const manualDayEnd = localStorage.getItem('progressly_manual_day_end');
+    if (manualDayEnd) {
+      try {
         const { date, endedAt } = JSON.parse(manualDayEnd);
-        // Only use the manual day end if it was set recently (within 24 hours)
         const endedAtTime = new Date(endedAt).getTime();
         const now = Date.now();
         const hoursAgo = (now - endedAtTime) / (1000 * 60 * 60);
         
         if (hoursAgo < 24) {
+          console.log('[Progressly] Using manual day end from localStorage:', date);
           setSelectedDate(parseISO(date));
+          setDateInitialized(true);
           return;
         } else {
           // Clear stale manual day end
           localStorage.removeItem('progressly_manual_day_end');
         }
+      } catch (e) {
+        localStorage.removeItem('progressly_manual_day_end');
       }
-      // Default: use effective_date from backend
-      setSelectedDate(parseISO(bootstrapData.effective_date));
     }
-  }, [bootstrapData?.effective_date, selectedDate]);
+  }, [dateInitialized]);
+
+  // SECOND: Use backend effective_date only if not already initialized
+  useEffect(() => {
+    if (bootstrapData?.effective_date && selectedDate === null && !dateInitialized) {
+      console.log('[Progressly] Using effective_date from backend:', bootstrapData.effective_date);
+      setSelectedDate(parseISO(bootstrapData.effective_date));
+      setDateInitialized(true);
+    }
+  }, [bootstrapData?.effective_date, selectedDate, dateInitialized]);
 
   const sortedCategories = useMemo(() => {
     if (!bootstrapData?.categories) return [];
