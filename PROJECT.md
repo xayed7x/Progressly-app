@@ -58,8 +58,9 @@ progressly-app/
 |-------|---------|
 | `goal` | User goals (onboarding) |
 | `category` | Activity categories (Work, Sleep, etc.) |
-| `logged_activity` | Individual activity entries |
+| `logged_activity` | Individual activity entries with `effective_date` |
 | `daily_target` | Daily time targets per category |
+| `user_sessions` | **NEW:** End My Day state for cross-device sync |
 | `conversations` | AI chat conversations |
 | `messages` | Chat messages |
 
@@ -192,11 +193,43 @@ CLEANUP_SECRET_TOKEN=
 
 ## 📝 Recent Changes Log
 
+### December 20, 2024 - **Effective Date System Upgrade** 🎉
+
+**Major Feature: Psychological Day Tracking**
+
+The app now tracks your "psychological day" (sleep-to-sleep) instead of calendar day:
+
+| Feature | Description |
+|---------|-------------|
+| **Cross-Device Sync** | `user_sessions` table stores current day - syncs between mobile & desktop |
+| **End My Day Button** | Manual day advancement with lock to prevent double-clicks |
+| **Timezone-Safe Dates** | Using `format()` instead of `toISOString()` for consistent local dates |
+| **Effective Date Column** | `loggedactivity.effective_date` field for "psychological day" assignment |
+
+**Database Changes:**
+- Added `user_sessions` table for End My Day persistence
+- Added `effective_date` column to `loggedactivity` table
+- Added indexes for performance
+
+**Backend Changes:**
+- `POST /api/end-day` - Saves End My Day state to database
+- `GET /api/dashboard-bootstrap` - Returns `effective_date` from `user_sessions`
+- Activity creation uses frontend's `target_date` directly as `effective_date`
+
+**Frontend Changes:**
+- Backend `effective_date` is now the source of truth (not localStorage)
+- All date formatting uses `format()` for timezone consistency
+- Added debug logging throughout date flow
+
 ### December 18, 2024
 - **Smart Day Change:** Day no longer changes at midnight
-- **Night Sleep Detection:** 4AM-12PM + 2hr minimum
-- **End My Day Button:** Manual day advancement
-- **effective_date API:** Backend returns user's current "day"
+- **Night Sleep Detection:** Sleep must end 4AM-12PM AND duration >= 2hr to advance day
+- **End My Day Button:** Manual day advancement with localStorage persistence
+- **effective_date API:** Backend returns user's current "day" based on sleep patterns
+- **localStorage Priority:** Manual day end persists on hard refresh (24hr expiry)
+- **SWR Auth Fix:** Data fetching waits for user authentication
+- **last_end_time Update:** Start Time field updates after logging activity
+
 
 ---
 

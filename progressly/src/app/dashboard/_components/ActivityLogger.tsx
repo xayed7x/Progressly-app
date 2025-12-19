@@ -18,7 +18,8 @@ import SubmitButton from "./SubmitButton";
 import AnimatedPlaceholderInput from "./AnimatedPlaceholderInput";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { db, QueuedActivity } from "@/lib/db";
-import { subDays, formatISO } from "date-fns";
+import { isToday, format } from "date-fns";
+import { Moon } from "lucide-react";
 
 export default function ActivityLogger({
   lastEndTime,
@@ -36,18 +37,26 @@ export default function ActivityLogger({
   const formRef = useRef<HTMLFormElement>(null);
   const [activityName, setActivityName] = useState("");
   const isOnline = useOnlineStatus();
+  
+  // Check if we're in a late-night session (logging to a past date)
+  const currentHour = new Date().getHours();
+  const isLateNightSession = !isToday(selectedDate) && currentHour < 6;
 
   const handleFormSubmit = async (formData: FormData) => {
     const startTime = formData.get("start_time") as string;
     const endTime = formData.get("end_time") as string;
 
     // Determine the target date for the activity
-    let dateForActivity = selectedDate;
-    if (endTime < startTime) {
-      // If end time is on the next day, the activity belongs to the previous day
-      dateForActivity = subDays(selectedDate, 1);
-    }
-    const target_date = formatISO(dateForActivity, { representation: "date" });
+    // ALWAYS use the selectedDate directly - this is the "psychological day" the user is viewing
+    // Do NOT adjust the date based on overnight times - the user is explicitly logging to the selected date
+    const target_date = format(selectedDate, 'yyyy-MM-dd');
+    
+    console.log('[Progressly ActivityLogger] Logging activity:', {
+      selectedDate: format(selectedDate, 'yyyy-MM-dd'),
+      startTime,
+      endTime,
+      target_date
+    });
 
     try {
       if (isOnline) {
@@ -105,6 +114,12 @@ export default function ActivityLogger({
     >
       <Card className="bg-secondary text-textDark w-full max-w-lg">
         <CardHeader>
+          {isLateNightSession && (
+            <div className="flex items-center gap-2 px-3 py-2 mb-2 bg-purple-500/10 border border-purple-500/30 text-purple-300 rounded-lg text-sm">
+              <Moon className="h-4 w-4" />
+              <span>🌙 Still in your {format(selectedDate, "MMM d")} session</span>
+            </div>
+          )}
           <CardTitle className="font-serif text-2xl">
             Log Your Activity
           </CardTitle>

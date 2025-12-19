@@ -40,6 +40,7 @@ CREATE TABLE public.loggedactivity (
   user_id character varying NOT NULL,
   activity_date timestamp without time zone NOT NULL DEFAULT now(),
   category_id integer,
+  effective_date date,
   CONSTRAINT loggedactivity_pkey PRIMARY KEY (id),
   CONSTRAINT loggedactivity_category_id_fkey1 FOREIGN KEY (category_id) REFERENCES public.category(id)
 );
@@ -52,4 +53,19 @@ CREATE TABLE public.messages (
   created_at timestamp without time zone NOT NULL,
   CONSTRAINT messages_pkey PRIMARY KEY (id),
   CONSTRAINT messages_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES public.conversations(id)
+);
+CREATE TABLE public.user_sessions (
+  id integer NOT NULL DEFAULT nextval('user_sessions_id_seq'::regclass),
+  user_id character varying NOT NULL UNIQUE,
+  current_effective_date date NOT NULL,
+  ended_at timestamp without time zone DEFAULT now(),
+  CONSTRAINT user_sessions_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.users (
+  id character varying NOT NULL,
+  email character varying NOT NULL UNIQUE,
+  full_name character varying,
+  avatar_url character varying,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT users_pkey PRIMARY KEY (id)
 );

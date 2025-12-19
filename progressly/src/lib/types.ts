@@ -7,6 +7,7 @@ export type Activity = {
   created_at: string;
   updated_at: string;
   activity_date: string;
+  effective_date: string | null;  // Psychological day (wake-up to wake-up)
 };
 
 export type Category = {

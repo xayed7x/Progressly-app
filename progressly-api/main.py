@@ -237,6 +237,55 @@ def delete_daily_target(
         print(f"ERROR in delete_daily_target: {type(e).__name__}: {e}")
         raise HTTPException(status_code=500, detail="Failed to delete daily target.")
 
+# === End Day Endpoint (for cross-device sync) ===
+class EndDayRequest(SQLModel):
+    new_effective_date: date
+
+class EndDayResponse(SQLModel):
+    success: bool
+    new_effective_date: date
+
+@app.post("/api/end-day", response_model=EndDayResponse)
+def end_my_day(
+    request: EndDayRequest,
+    db: DBSession,
+    user_id: str = Depends(get_current_user)
+):
+    """
+    End the user's current day and advance to a new effective date.
+    This is used for cross-device sync of the 'End My Day' feature.
+    """
+    from models import UserSession
+    
+    try:
+        # Check if user already has a session record
+        existing_session = db.exec(
+            select(UserSession).where(UserSession.user_id == user_id)
+        ).first()
+        
+        if existing_session:
+            # Update existing session
+            existing_session.current_effective_date = request.new_effective_date
+            existing_session.ended_at = datetime.utcnow()
+        else:
+            # Create new session record
+            new_session = UserSession(
+                user_id=user_id,
+                current_effective_date=request.new_effective_date,
+                ended_at=datetime.utcnow()
+            )
+            db.add(new_session)
+        
+        db.commit()
+        
+        return EndDayResponse(
+            success=True,
+            new_effective_date=request.new_effective_date
+        )
+    except Exception as e:
+        print(f"ERROR in end_my_day: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to end day.")
+
 # === Categories Endpoints ===
 @app.get("/api/categories/", response_model=list[Category])
 @app.get("/api/categories", response_model=list[Category])
@@ -275,22 +324,41 @@ def create_category(
         raise HTTPException(status_code=500, detail="Failed to create category.")
 
 # === Activity Endpoints ===
-@app.post("/api/activities", response_model=LoggedActivity)
+@app.post("/api/activities", response_model=ActivityReadWithCategory)
 def create_activity(activity_data: ActivityCreate, db: DBSession, user_id: str = Depends(get_current_user)):
     activity_dict = activity_data.model_dump(exclude={'target_date'})
-    # Parse the date string from the client
-    date_to_save = datetime.fromisoformat(activity_data.target_date).date()
+    
+    # The frontend sends the correct date (selectedDate) in target_date
+    # This is the user's current "psychological day" - trust it directly
+    selected_date = datetime.fromisoformat(activity_data.target_date).date()
+    
+    print(f"[Progressly] Creating activity for user {user_id}, effective_date: {selected_date}")
 
     new_activity = LoggedActivity(
         **activity_dict,
         user_id=user_id,
-        activity_date=date_to_save
+        activity_date=datetime.now(),  # Actual timestamp for when activity was logged
+        effective_date=selected_date   # The psychological day (from frontend)
     )
 
     db.add(new_activity)
     db.commit()
     db.refresh(new_activity)
-    return new_activity
+    
+    # Return with category data
+    category = db.get(Category, new_activity.category_id) if new_activity.category_id else None
+    
+    return ActivityReadWithCategory(
+        id=new_activity.id,
+        user_id=new_activity.user_id,
+        activity_date=new_activity.activity_date,
+        effective_date=new_activity.effective_date,
+        activity_name=new_activity.activity_name,
+        start_time=new_activity.start_time,
+        end_time=new_activity.end_time,
+        category_id=new_activity.category_id,
+        category=category
+    )
 
 @app.get("/api/activities", response_model=list[ActivityReadWithCategory])
 def get_activities(
@@ -375,6 +443,7 @@ def get_activities(
                 "start_time": a.start_time,
                 "end_time": a.end_time,
                 "activity_date": a.activity_date,
+                "effective_date": a.effective_date,
                 "user_id": a.user_id,
                 "category_id": a.category_id,
                 "category": category_obj,
@@ -488,6 +557,7 @@ def get_dashboard_bootstrap(db: DBSession, user_id: str = Depends(get_current_us
                     start_time=a.start_time,
                     end_time=a.end_time,
                     activity_date=a.activity_date,
+                    effective_date=a.effective_date,  # CRITICAL: Include psychological day for filtering
                     user_id=a.user_id,
                     category_id=a.category_id,
                     category=category_obj,
@@ -533,43 +603,61 @@ def get_dashboard_bootstrap(db: DBSession, user_id: str = Depends(get_current_us
         latest_activity = db.exec(latest_activity_statement).first()
         last_end_time = latest_activity.end_time if latest_activity else None
 
-        # 4. Calculate effective_date based on wake-up logic
-        # The effective date is "today" only if user has logged sleep that ends today
-        # Otherwise, it's "yesterday" (user is still in yesterday's day cycle)
+        # 4. Calculate effective_date - PRIORITY ORDER:
+        # 1. Check user_sessions table for manual End Day (cross-device sync)
+        # 2. Check if Night Sleep ended today
+        # 3. Default to today
+        from models import UserSession
+        
         effective_date = today
         
-        # Find the user's Sleep category
-        sleep_category = db.exec(
-            select(Category)
-            .where(Category.user_id == user_id)
-            .where(Category.name.ilike("sleep"))
+        # Priority 1: Check if user has a saved session (from End My Day)
+        user_session = db.exec(
+            select(UserSession).where(UserSession.user_id == user_id)
         ).first()
         
-        if sleep_category:
-            # Check if there's a sleep activity that started yesterday and ended today
-            yesterday = today - timedelta(days=1)
-            sleep_that_ended_today = False
+        if user_session:
+            # Use the saved effective date, but only if it's recent (within 48 hours)
+            hours_since_ended = (datetime.utcnow() - user_session.ended_at).total_seconds() / 3600
+            if hours_since_ended < 48:
+                effective_date = user_session.current_effective_date
+                print(f"[Progressly] Using saved session effective_date: {effective_date}")
+            else:
+                # Session too old, delete it
+                db.delete(user_session)
+                db.commit()
+        
+        # If no saved session, check for night sleep (Priority 2)
+        if not user_session or (user_session and (datetime.utcnow() - user_session.ended_at).total_seconds() / 3600 >= 48):
+            sleep_category = db.exec(
+                select(Category)
+                .where(Category.user_id == user_id)
+                .where(Category.name.ilike("sleep"))
+            ).first()
             
-            for activity in all_activities_raw:
-                if activity.category_id != sleep_category.id:
-                    continue
-                    
-                # Check if this is an overnight sleep that ended today
-                activity_start = datetime.combine(activity.activity_date, activity.start_time)
-                activity_end = datetime.combine(
-                    activity.activity_date + timedelta(days=1) if activity.end_time < activity.start_time 
-                    else activity.activity_date, 
-                    activity.end_time
-                )
+            if sleep_category:
+                yesterday = today - timedelta(days=1)
+                sleep_that_ended_today = False
                 
-                # If sleep started yesterday and ended today, user has woken up today
-                if activity_start.date() == yesterday and activity_end.date() == today:
-                    sleep_that_ended_today = True
-                    break
-            
-            # If no sleep ended today, user is still in yesterday's day cycle
-            if not sleep_that_ended_today:
-                effective_date = yesterday
+                for activity in all_activities_raw:
+                    if activity.category_id != sleep_category.id:
+                        continue
+                        
+                    # Check if this is an overnight sleep that ended today
+                    activity_start = datetime.combine(activity.activity_date, activity.start_time)
+                    activity_end = datetime.combine(
+                        activity.activity_date + timedelta(days=1) if activity.end_time < activity.start_time 
+                        else activity.activity_date, 
+                        activity.end_time
+                    )
+                    
+                    if activity_start.date() == yesterday and activity_end.date() == today:
+                        sleep_that_ended_today = True
+                        break
+                
+                # If no sleep ended today, user is still in yesterday's day cycle
+                if not sleep_that_ended_today:
+                    effective_date = yesterday
 
         return DashboardBootstrapResponse(
             activities_last_3_days=activities_last_3_days,
@@ -624,6 +712,7 @@ def update_activity(
         id=activity.id,
         user_id=activity.user_id,
         activity_date=activity.activity_date,
+        effective_date=activity.effective_date,
         activity_name=activity.activity_name,
         start_time=activity.start_time,
         end_time=activity.end_time,

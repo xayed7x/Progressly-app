@@ -1,0 +1,2804 @@
+# Progressly App - Technical Upgrade Specification
+
+## Document Purpose
+This document guides the implementation of Progressly's upgrade from a basic time-tracking app to a comprehensive 100-day consistency challenge platform with AI coaching. Reference sections by number when implementing specific features.
+
+---
+
+## Table of Contents
+1. [Current System Overview](#1-current-system-overview)
+2. [Technology Stack](#2-technology-stack)
+3. [Database Schema Changes](#3-database-schema-changes)
+4. [Core Architecture Changes](#4-core-architecture-changes)
+5. [Section 1: Challenge Setup System](#5-section-1-challenge-setup-system)
+6. [Section 2: Daily Challenge Dashboard](#6-section-2-daily-challenge-dashboard)
+7. [Section 3: Quick Tap Logging System](#7-section-3-quick-tap-logging-system)
+8. [Section 4: End-of-Day Summary Workflow](#8-section-4-end-of-day-summary-workflow)
+9. [Section 5: Heatmap Calendar Visualization](#9-section-5-heatmap-calendar-visualization)
+10. [Section 6: Dual-Ring Progress Indicators](#10-section-6-dual-ring-progress-indicators)
+11. [Section 7: Pattern Detection Engine](#11-section-7-pattern-detection-engine)
+12. [Section 8: AI Coach Enhancement](#12-section-8-ai-coach-enhancement)
+13. [Section 9: Voice Logging System](#13-section-9-voice-logging-system)
+14. [Section 10: Analytics & Insights Dashboard](#14-section-10-analytics--insights-dashboard)
+15. [Section 11: Notification System](#15-section-11-notification-system)
+16. [Integration Points](#16-integration-points)
+
+---
+
+## 1. Current System Overview
+
+### 1.1 Existing Features
+- **Authentication**: Supabase with Google OAuth
+- **Activity Logging**: Manual entry with name, start time, end time, category
+- **Categories**: 13 default categories (Study, Leisure, Work, Family, Personal, Meetings, Workout, etc.) with custom colors
+- **Visualizations**: 
+  - Pie chart showing time distribution by category (multi-color based on category colors)
+  - Bar chart/budget view showing time spent per category
+- **Goals Section**: 
+  - Big goal setting (long-term aspirations)
+  - Category-based targeted goals (e.g., "Study 10 hours/day")
+- **AI Chat**: Basic chat interface for discussing goals and activities
+- **Smart Feature**: New activity start time auto-fills with previous activity end time
+
+### 1.2 Current Data Flow
+```
+User creates activity → 
+  Fills: name, start_time, end_time, category →
+  Activity saved to database →
+  Duration calculated (end_time - start_time) →
+  Aggregated by category →
+  Displayed in pie/bar charts with category colors
+```
+
+### 1.3 Key Constraint
+The existing pie chart and bar chart visualization use **category-based colors** (Study=green, Leisure=blue, etc.). This system must remain intact for time-tracking visualization. New challenge-based visualizations will be **separate** and use **performance-based colors**.
+
+---
+
+## 2. Technology Stack
+
+### 2.1 Frontend
+- **Framework**: React (existing)
+- **Styling**: Tailwind CSS
+- **Charts**: Recharts or Chart.js (for new visualizations)
+- **Icons**: Lucide React
+- **State Management**: React hooks (useState, useReducer, useContext)
+- **HTTP Client**: Fetch API or axios
+- **Date Handling**: date-fns or day.js
+
+### 2.2 Backend
+- **Database**: Supabase (PostgreSQL)
+- **Authentication**: Supabase Auth (Google OAuth)
+- **Real-time**: Supabase Realtime (optional for live updates)
+- **Storage**: Supabase Storage (if needed for future features)
+
+### 2.3 AI Integration
+- **Provider**: Anthropic Claude API
+- **Model**: Claude Sonnet 4
+- **Implementation**: Direct API calls from frontend (API key secured via environment variables or Supabase Edge Functions)
+
+### 2.4 Additional APIs
+- **Speech-to-Text**: Web Speech API (built into modern browsers)
+- **Notifications**: Web Push Notifications API
+
+---
+
+## 3. Database Schema Changes
+
+### 3.1 New Table: challenges
+```sql
+CREATE TABLE challenges (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  start_date DATE NOT NULL,
+  end_date DATE NOT NULL,
+  duration_days INTEGER NOT NULL,
+  status TEXT DEFAULT 'active', -- 'active', 'completed', 'abandoned'
+  
+  -- Challenge commitments stored as JSONB
+  commitments JSONB NOT NULL,
+  -- Example structure:
+  -- [
+  --   {
+  --     "id": "commitment_1",
+  --     "habit": "study",
+  --     "target": 10,
+  --     "unit": "hours",
+  --     "frequency": "daily",
+  --     "category": "Study"
+  --   },
+  --   {
+  --     "id": "commitment_2",
+  --     "habit": "running",
+  --     "target": "complete",
+  --     "frequency": "daily",
+  --     "category": "Exercise"
+  --   },
+  --   {
+  --     "id": "commitment_3",
+  --     "habit": "workout",
+  --     "target": "complete",
+  --     "frequency": "weekly",
+  --     "days_of_week": [1, 3, 5, 0], -- Monday, Wednesday, Friday, Sunday
+  --     "category": "Exercise"
+  --   }
+  -- ]
+  
+  -- Psychology-based fields
+  identity_statement TEXT,
+  why_statement TEXT,
+  obstacle_prediction TEXT,
+  success_threshold NUMERIC DEFAULT 70, -- Minimum % to consider challenge successful
+  
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_challenges_user_id ON challenges(user_id);
+CREATE INDEX idx_challenges_status ON challenges(status);
+```
+
+### 3.2 New Table: daily_challenge_metrics
+```sql
+CREATE TABLE daily_challenge_metrics (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  challenge_id UUID REFERENCES challenges(id) ON DELETE CASCADE,
+  date DATE NOT NULL,
+  day_number INTEGER NOT NULL, -- 1 to 100 (or duration_days)
+  
+  -- Status of each commitment for this day (JSONB)
+  commitments_status JSONB NOT NULL,
+  -- Example structure:
+  -- {
+  --   "commitment_1": {
+  --     "target": 10,
+  --     "actual": 8.5,
+  --     "unit": "hours",
+  --     "completion_pct": 85,
+  --     "status": "partial"
+  --   },
+  --   "commitment_2": {
+  --     "target": "complete",
+  --     "actual": "yes",
+  --     "completion_pct": 100,
+  --     "status": "complete"
+  --   },
+  --   "commitment_3": {
+  --     "target": "complete",
+  --     "actual": "not_scheduled",
+  --     "completion_pct": null,
+  --     "status": "not_applicable"
+  --   }
+  -- }
+  
+  -- Aggregate metrics for the day
+  overall_completion_pct NUMERIC, -- Average of applicable commitments
+  consistency_score NUMERIC, -- Did user show up at all? (any activity > 0)
+  diligence_score NUMERIC, -- How much of committed time was fulfilled?
+  
+  -- Cumulative metrics (up to this day)
+  cumulative_consistency_rate NUMERIC,
+  cumulative_diligence_rate NUMERIC,
+  resilience_score INTEGER DEFAULT 0,
+  
+  -- Context
+  day_of_week TEXT,
+  notes TEXT,
+  mood TEXT, -- 'great', 'good', 'okay', 'bad', 'terrible'
+  energy_level INTEGER, -- 1-5
+  
+  -- Recovery tracking (for AVE prevention)
+  is_recovery_day BOOLEAN DEFAULT false,
+  days_since_last_miss INTEGER DEFAULT 0,
+  consecutive_completion_streak INTEGER DEFAULT 0,
+  
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  
+  UNIQUE(challenge_id, date)
+);
+
+CREATE INDEX idx_daily_metrics_challenge_id ON daily_challenge_metrics(challenge_id);
+CREATE INDEX idx_daily_metrics_date ON daily_challenge_metrics(date);
+```
+
+### 3.3 New Table: behavior_patterns
+```sql
+CREATE TABLE behavior_patterns (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  challenge_id UUID REFERENCES challenges(id) ON DELETE CASCADE,
+  pattern_type TEXT NOT NULL, -- 'weak_day', 'strong_day', 'strong_time', 'recovery_speed', 'failure_trigger'
+  
+  pattern_data JSONB NOT NULL,
+  -- Example structures by type:
+  -- weak_day: {"day": "Friday", "avg_completion": 65, "sample_size": 8}
+  -- strong_time: {"time_block": "9am-12pm", "avg_productivity": 92, "sample_size": 45}
+  -- recovery_speed: {"avg_days_to_recover": 1.2, "fastest": 0, "slowest": 3}
+  
+  confidence_score NUMERIC, -- 0-100, based on sample size and consistency
+  discovered_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  last_updated TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_patterns_challenge_id ON behavior_patterns(challenge_id);
+CREATE INDEX idx_patterns_type ON behavior_patterns(pattern_type);
+```
+
+### 3.4 New Table: activity_presets
+```sql
+CREATE TABLE activity_presets (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  activity_name TEXT NOT NULL,
+  category TEXT NOT NULL,
+  is_frequent BOOLEAN DEFAULT false,
+  usage_count INTEGER DEFAULT 0,
+  last_used_at TIMESTAMP WITH TIME ZONE,
+  
+  -- For smart suggestions
+  typical_start_time TIME,
+  typical_duration INTERVAL,
+  typical_days_of_week INTEGER[], -- [0,1,2,3,4,5,6] for Sun-Sat
+  
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_presets_user_id ON activity_presets(user_id);
+CREATE INDEX idx_presets_frequent ON activity_presets(is_frequent);
+```
+
+### 3.5 Modification to Existing activities Table
+```sql
+-- Assuming existing structure, add these columns:
+ALTER TABLE activities ADD COLUMN IF NOT EXISTS challenge_id UUID REFERENCES challenges(id);
+ALTER TABLE activities ADD COLUMN IF NOT EXISTS commitment_id TEXT; -- matches commitment id in challenges.commitments JSONB
+ALTER TABLE activities ADD COLUMN IF NOT EXISTS is_auto_logged BOOLEAN DEFAULT false;
+
+CREATE INDEX idx_activities_challenge_id ON activities(challenge_id);
+```
+
+### 3.6 Database Functions
+
+#### Function: Calculate Daily Challenge Metrics
+```sql
+CREATE OR REPLACE FUNCTION calculate_daily_metrics(p_challenge_id UUID, p_date DATE)
+RETURNS void AS $$
+DECLARE
+  v_challenge RECORD;
+  v_commitment JSONB;
+  v_commitments_status JSONB := '{}';
+  v_total_completion NUMERIC := 0;
+  v_applicable_count INTEGER := 0;
+BEGIN
+  -- Get challenge details
+  SELECT * INTO v_challenge FROM challenges WHERE id = p_challenge_id;
+  
+  -- Loop through commitments
+  FOR v_commitment IN SELECT * FROM jsonb_array_elements(v_challenge.commitments)
+  LOOP
+    -- Calculate actual values from activities table
+    -- This is pseudocode - actual implementation will aggregate activities by category and date
+    
+    -- Update commitments_status JSONB
+    -- Update v_total_completion
+    -- Update v_applicable_count
+  END LOOP;
+  
+  -- Insert or update daily_challenge_metrics
+  -- Calculate cumulative metrics
+  -- Update resilience_score based on recovery patterns
+END;
+$$ LANGUAGE plpgsql;
+```
+
+#### Function: Detect Behavior Patterns
+```sql
+CREATE OR REPLACE FUNCTION detect_patterns(p_challenge_id UUID)
+RETURNS void AS $$
+BEGIN
+  -- Analyze daily_challenge_metrics for the challenge
+  -- Detect weak days (day of week with lowest avg completion)
+  -- Detect strong times (time blocks with highest productivity)
+  -- Calculate recovery speed (avg days between miss and return)
+  -- Insert into behavior_patterns table
+END;
+$$ LANGUAGE plpgsql;
+```
+
+---
+
+## 4. Core Architecture Changes
+
+### 4.1 Application Structure
+```
+src/
+├── components/
+│   ├── challenges/
+│   │   ├── ChallengeSetup.jsx
+│   │   ├── ChallengeDashboard.jsx
+│   │   ├── DailyCommitments.jsx
+│   │   ├── QuickTapCard.jsx
+│   │   ├── HeatmapCalendar.jsx
+│   │   ├── DualRingProgress.jsx
+│   │   └── EndOfDaySummary.jsx
+│   ├── logging/
+│   │   ├── QuickTapLogging.jsx
+│   │   ├── VoiceLogging.jsx
+│   │   ├── ManualLogging.jsx (existing)
+│   │   └── ActivityTimer.jsx
+│   ├── analytics/
+│   │   ├── PatternInsights.jsx
+│   │   ├── WeeklyAnalysis.jsx
+│   │   └── PerformanceCharts.jsx
+│   ├── ai/
+│   │   ├── AICoach.jsx (enhanced)
+│   │   └── AIContext.jsx
+│   └── shared/
+│       ├── CategoryColorMap.js
+│       └── DateUtils.js
+├── hooks/
+│   ├── useChallenges.js
+│   ├── useDailyMetrics.js
+│   ├── usePatterns.js
+│   ├── useActivityLogging.js
+│   └── useVoiceRecognition.js
+├── services/
+│   ├── supabaseClient.js (existing)
+│   ├── challengeService.js
+│   ├── metricsService.js
+│   ├── patternService.js
+│   ├── aiService.js
+│   └── voiceService.js
+├── utils/
+│   ├── calculations.js
+│   ├── dateHelpers.js
+│   └── colorUtils.js
+└── contexts/
+    └── ChallengeContext.jsx
+```
+
+### 4.2 State Management Strategy
+- **Global State**: React Context for active challenge, user preferences
+- **Local State**: Component-level useState for UI interactions
+- **Server State**: Supabase real-time subscriptions for live updates
+- **Derived State**: Computed values (metrics, patterns) calculated on-demand
+
+### 4.3 Data Flow Architecture
+```
+User Action (e.g., logs activity) →
+  Activity saved to activities table →
+  Trigger recalculates daily_challenge_metrics →
+  Pattern detection runs (if enough data) →
+  UI components re-fetch and re-render →
+  AI coach has updated context for next interaction
+```
+
+---
+
+## 5. Section 1: Challenge Setup System
+
+### 5.1 User Flow
+1. User clicks "Start New Challenge" button
+2. Multi-step wizard opens:
+   - Step 1: Basic info (name, dates, duration)
+   - Step 2: Add commitments (daily/weekly goals)
+   - Step 3: Identity statements (psychology)
+   - Step 4: Review and confirm
+3. Challenge created, user redirected to Challenge Dashboard
+
+### 5.2 Component: ChallengeSetup.jsx
+
+#### Props
+```javascript
+{
+  onComplete: (challengeId) => void,
+  onCancel: () => void
+}
+```
+
+#### State
+```javascript
+{
+  currentStep: 1-4,
+  challengeData: {
+    name: string,
+    startDate: Date,
+    endDate: Date,
+    durationDays: number,
+    commitments: [
+      {
+        id: string,
+        habit: string,
+        target: number | "complete",
+        unit: "hours" | "minutes" | null,
+        frequency: "daily" | "weekly",
+        daysOfWeek: number[] | null,
+        category: string
+      }
+    ],
+    identityStatement: string,
+    whyStatement: string,
+    obstaclePrediction: string,
+    successThreshold: number
+  }
+}
+```
+
+#### Functionality
+- **Step 1**: Date pickers, auto-calculate duration
+- **Step 2**: 
+  - "Add Commitment" button opens modal
+  - Select frequency (daily/weekly)
+  - If weekly, show day selector (Mon, Tue, Wed...)
+  - Select category from existing categories
+  - Set target (numeric for time-based, checkbox for completion-based)
+  - Display commitments list with edit/delete options
+- **Step 3**: 
+  - Text areas for identity, why, and obstacle statements
+  - Slider for success threshold (50-100%)
+  - Examples/prompts to guide user
+- **Step 4**: 
+  - Review all entered data
+  - "Start Challenge" button
+  - Save to database via challengeService
+
+### 5.3 Service: challengeService.js
+
+#### Methods
+```javascript
+async createChallenge(challengeData)
+  - Insert into challenges table
+  - Return challenge ID
+  - Initialize first day in daily_challenge_metrics
+
+async updateChallenge(challengeId, updates)
+  - Update challenge fields
+  - Recalculate metrics if commitments changed
+
+async getActiveChallenge(userId)
+  - Fetch active challenge for user
+  - Return null if none
+
+async getChallengeById(challengeId)
+  - Fetch full challenge data
+  - Include commitments
+
+async completeChallenge(challengeId)
+  - Set status to 'completed'
+  - Calculate final statistics
+
+async abandonChallenge(challengeId, reason)
+  - Set status to 'abandoned'
+  - Store reason in notes
+```
+
+### 5.4 Database Interaction
+```javascript
+// Example: createChallenge
+const { data, error } = await supabase
+  .from('challenges')
+  .insert({
+    user_id: userId,
+    name: challengeData.name,
+    start_date: challengeData.startDate,
+    end_date: challengeData.endDate,
+    duration_days: challengeData.durationDays,
+    commitments: challengeData.commitments,
+    identity_statement: challengeData.identityStatement,
+    why_statement: challengeData.whyStatement,
+    obstacle_prediction: challengeData.obstaclePrediction,
+    success_threshold: challengeData.successThreshold
+  })
+  .select()
+  .single();
+
+// Initialize first day metrics
+await supabase
+  .from('daily_challenge_metrics')
+  .insert({
+    challenge_id: data.id,
+    date: challengeData.startDate,
+    day_number: 1,
+    commitments_status: {}, // Empty on day 1
+    overall_completion_pct: 0,
+    cumulative_consistency_rate: 0,
+    cumulative_diligence_rate: 0
+  });
+```
+
+### 5.5 Validation Rules
+- Name: Required, 3-100 characters
+- Dates: Start date cannot be in past, end date must be after start
+- Duration: Must be between 1-365 days
+- Commitments: At least 1 commitment required
+- Target values: Must be > 0 for numeric targets
+- Category: Must exist in user's categories
+
+---
+
+## 6. Section 2: Daily Challenge Dashboard
+
+### 6.1 Layout Structure
+```
+┌─────────────────────────────────────────┐
+│  Challenge Header                       │
+│  - Name, Day X/Total, Overall Progress  │
+└─────────────────────────────────────────┘
+
+┌─────────────────────────────────────────┐
+│  Today's Commitments Section            │
+│  - List of commitments with progress    │
+│  - Quick action buttons                 │
+└─────────────────────────────────────────┘
+
+┌──────────────┬──────────────────────────┐
+│ Consistency  │  Daily Activity Feed     │
+│ & Diligence  │  - Recent logs           │
+│ Rings        │  - Time spent today      │
+└──────────────┴──────────────────────────┘
+
+┌─────────────────────────────────────────┐
+│  Heatmap Calendar (collapsible)         │
+└─────────────────────────────────────────┘
+
+┌─────────────────────────────────────────┐
+│  AI Coach Section                       │
+│  - Quick coaching message               │
+│  - "Chat with Coach" button             │
+└─────────────────────────────────────────┘
+```
+
+### 6.2 Component: ChallengeDashboard.jsx
+
+#### State
+```javascript
+{
+  challenge: object,
+  todayMetrics: object,
+  commitmentProgress: {
+    [commitmentId]: {
+      target: number,
+      actual: number,
+      percentage: number,
+      status: 'not_started' | 'in_progress' | 'complete'
+    }
+  },
+  todayActivities: array,
+  loading: boolean
+}
+```
+
+#### Data Fetching
+```javascript
+useEffect(() => {
+  // Fetch active challenge
+  const challenge = await challengeService.getActiveChallenge(userId);
+  
+  // Fetch today's metrics
+  const todayMetrics = await metricsService.getDailyMetrics(
+    challenge.id, 
+    new Date()
+  );
+  
+  // Fetch today's activities
+  const activities = await activityService.getActivitiesForDate(
+    userId,
+    new Date()
+  );
+  
+  // Calculate progress for each commitment
+  const progress = calculateCommitmentProgress(
+    challenge.commitments,
+    activities,
+    new Date()
+  );
+  
+  setState({ challenge, todayMetrics, todayActivities: activities, commitmentProgress: progress });
+}, [userId]);
+
+// Real-time updates
+useEffect(() => {
+  const subscription = supabase
+    .from('activities')
+    .on('INSERT', payload => {
+      // Update todayActivities
+      // Recalculate commitmentProgress
+    })
+    .subscribe();
+    
+  return () => subscription.unsubscribe();
+}, []);
+```
+
+### 6.3 Component: DailyCommitments.jsx
+
+#### Renders Each Commitment Card
+```javascript
+// Example structure
+{commitments.map(commitment => (
+  <CommitmentCard
+    key={commitment.id}
+    commitment={commitment}
+    progress={commitmentProgress[commitment.id]}
+    onQuickLog={() => handleQuickLog(commitment)}
+    onStartTimer={() => handleStartTimer(commitment)}
+  />
+))}
+```
+
+#### CommitmentCard Layout
+```
+┌─────────────────────────────────────────┐
+│ 📚 Study 10 hours                       │
+│ Progress: [███████░░░] 7/10 hrs (70%)   │
+│ [Quick Log] [Start Timer] [Mark Done]   │
+└─────────────────────────────────────────┘
+```
+
+#### Logic for Progress Calculation
+```javascript
+function calculateCommitmentProgress(commitment, todayActivities) {
+  // Filter activities by category matching commitment
+  const relevantActivities = todayActivities.filter(
+    activity => activity.category === commitment.category
+  );
+  
+  if (commitment.unit === 'hours') {
+    // Sum duration of relevant activities
+    const totalMinutes = relevantActivities.reduce(
+      (sum, act) => sum + act.duration_minutes, 
+      0
+    );
+    const actual = totalMinutes / 60;
+    const target = commitment.target;
+    const percentage = Math.min((actual / target) * 100, 100);
+    
+    return { target, actual, percentage, status: getStatus(percentage) };
+  } else {
+    // Completion-based (yes/no)
+    const isComplete = relevantActivities.length > 0;
+    return { 
+      target: 'complete', 
+      actual: isComplete ? 'yes' : 'no',
+      percentage: isComplete ? 100 : 0,
+      status: isComplete ? 'complete' : 'not_started'
+    };
+  }
+}
+
+function getStatus(percentage) {
+  if (percentage === 0) return 'not_started';
+  if (percentage < 100) return 'in_progress';
+  return 'complete';
+}
+```
+
+#### Quick Action Buttons
+- **Quick Log**: Opens modal to log time directly for this commitment
+- **Start Timer**: Starts a running timer for this activity (like Quick Tap)
+- **Mark Done**: For completion-based commitments, marks as complete
+
+---
+
+## 7. Section 3: Quick Tap Logging System
+
+### 7.1 Concept
+Cards representing frequent activities. Tap once to start, tap again to stop. Automatically logs the activity with duration.
+
+### 7.2 Component: QuickTapLogging.jsx
+
+#### State
+```javascript
+{
+  presets: [
+    {
+      id: string,
+      activityName: string,
+      category: string,
+      isRunning: boolean,
+      startTime: Date | null
+    }
+  ],
+  runningActivity: string | null // ID of currently running activity
+}
+```
+
+#### Layout
+```
+Quick Log Activities:
+┌─────────┬─────────┬─────────┬─────────┐
+│ Study   │ Running │ Workout │ Eating  │
+│   📚    │   🏃    │   💪    │   🍽️   │
+│ [Tap]   │ [Tap]   │ [Tap]   │ [Tap]   │
+└─────────┴─────────┴─────────┴─────────┘
+
+Currently: Study (running for 1h 23m)
+[Stop Study] [Switch Activity]
+```
+
+#### Functionality
+
+**On First Tap (Start)**:
+```javascript
+async function handleStart(presetId) {
+  // Stop any currently running activity
+  if (runningActivity) {
+    await handleStop(runningActivity);
+  }
+  
+  // Start new activity
+  setRunningActivity(presetId);
+  updatePreset(presetId, { 
+    isRunning: true, 
+    startTime: new Date() 
+  });
+  
+  // Optional: Show timer in UI
+  startDisplayTimer(presetId);
+}
+```
+
+**On Second Tap (Stop)**:
+```javascript
+async function handleStop(presetId) {
+  const preset = presets.find(p => p.id === presetId);
+  const startTime = preset.startTime;
+  const endTime = new Date();
+  
+  // Create activity in database
+  await activityService.createActivity({
+    name: preset.activityName,
+    category: preset.category,
+    start_time: startTime,
+    end_time: endTime,
+    duration_minutes: (endTime - startTime) / 1000 / 60,
+    is_auto_logged: true,
+    challenge_id: activeChallengeId,
+    commitment_id: findMatchingCommitment(preset.category)
+  });
+  
+  // Reset preset state
+  updatePreset(presetId, { 
+    isRunning: false, 
+    startTime: null 
+  });
+  setRunningActivity(null);
+  
+  // Update usage count for smart sorting
+  await incrementPresetUsage(presetId);
+}
+```
+
+### 7.3 Component: ActivityTimer.jsx
+
+Displays running timer in UI.
+
+```javascript
+function ActivityTimer({ startTime }) {
+  const [elapsed, setElapsed] = useState(0);
+  
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = new Date();
+      const diff = now - startTime;
+      setElapsed(diff);
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [startTime]);
+  
+  const hours = Math.floor(elapsed / 1000 / 60 / 60);
+  const minutes = Math.floor((elapsed / 1000 / 60) % 60);
+  const seconds = Math.floor((elapsed / 1000) % 60);
+  
+  return (
+    <div className="timer">
+      {hours}h {minutes}m {seconds}s
+    </div>
+  );
+}
+```
+
+### 7.4 Preset Management
+
+#### Loading User Presets
+```javascript
+async function loadPresets(userId) {
+  const { data } = await supabase
+    .from('activity_presets')
+    .select('*')
+    .eq('user_id', userId)
+    .order('usage_count', { ascending: false })
+    .limit(8); // Show top 8 most used
+    
+  return data;
+}
+```
+
+#### Creating New Preset
+```javascript
+async function createPreset(userId, activityName, category) {
+  const { data } = await supabase
+    .from('activity_presets')
+    .insert({
+      user_id: userId,
+      activity_name: activityName,
+      category: category,
+      is_frequent: false,
+      usage_count: 0
+    })
+    .select()
+    .single();
+    
+  return data;
+}
+```
+
+#### Auto-promoting to Frequent
+```javascript
+// Run periodically or after each activity
+async function updateFrequentPresets(userId) {
+  await supabase
+    .from('activity_presets')
+    .update({ is_frequent: true })
+    .eq('user_id', userId)
+    .gte('usage_count', 10); // Threshold: 10 uses
+}
+```
+
+### 7.5 Smart Auto-stop
+
+If user forgets to stop, auto-stop when:
+1. New activity started
+2. System detects inactivity (optional, requires device permissions)
+3. User manually stops via dashboard button
+
+---
+
+## 8. Section 4: End-of-Day Summary Workflow
+
+### 8.1 Trigger
+- Scheduled notification at user-defined time (default: 9:00 PM)
+- Manual trigger: "End Day" button on dashboard
+- Auto-trigger if no activity logged after midnight
+
+### 8.2 Component: EndOfDaySummary.jsx
+
+#### State
+```javascript
+{
+  todayActivities: array,
+  missingTimeBlocks: [
+    { start: Date, end: Date, duration: number }
+  ],
+  quickFillCategories: array,
+  selectedFills: {
+    [timeBlockId]: { category: string, activityName: string }
+  },
+  commitmentStatus: object,
+  notes: string,
+  mood: string,
+  energyLevel: number
+}
+```
+
+#### Layout
+```
+End of Day Review - Day 47/100
+──────────────────────────────────────
+
+Today's Activities:
+✓ Running - 6:00 AM - 6:30 AM (30 min)
+✓ Study - 9:00 AM - 12:00 PM (3 hours)
+✓ Lunch - 12:00 PM - 1:00 PM (1 hour)
+✓ Study - 2:00 PM - 6:00 PM (4 hours)
+
+Missing Time: 4 hours (3 blocks)
+──────────────────────────────────────
+
+⚠️ 6:30 AM - 9:00 AM (2.5 hours)
+   Quick fill: [Eating] [Personal] [Other]
+   Or specify: [Activity Name] [Category]
+
+⚠️ 1:00 PM - 2:00 PM (1 hour)
+   Quick fill: [Eating] [Personal] [Break]
+
+⚠️ 6:00 PM - 10:00 PM (4 hours)
+   Quick fill: [Family] [Leisure] [Other]
+
+──────────────────────────────────────
+
+Today's Goal Status:
+• Study 10 hours: 7/10 (70%) ⚠️
+• Running: Complete ✓
+• Workout: Not scheduled today
+
+──────────────────────────────────────
+
+How was today?
+Mood: [😊 Great] [🙂 Good] [😐 Okay] [😟 Bad] [😢 Terrible]
+Energy: [⚫⚫⚫⚪⚪] (3/5)
+
+Notes (optional):
+[Text area for reflections]
+
+──────────────────────────────────────
+
+[Save & Complete Day] [Continue Tomorrow]
+```
+
+#### Functionality
+
+**Detect Missing Time**:
+```javascript
+function detectMissingTimeBlocks(activities, startOfDay, endOfDay) {
+  // Sort activities by start time
+  const sorted = activities.sort((a, b) => a.start_time - b.start_time);
+  
+  const gaps = [];
+  let currentTime = startOfDay;
+  
+  sorted.forEach(activity => {
+    if (activity.start_time > currentTime) {
+      gaps.push({
+        start: currentTime,
+        end: activity.start_time,
+        duration: (activity.start_time - currentTime) / 1000 / 60
+      });
+    }
+    currentTime = activity.end_time;
+  });
+  
+  // Check gap after last activity
+  if (currentTime < endOfDay) {
+    gaps.push({
+      start: currentTime,
+      end: endOfDay,
+      duration: (endOfDay - currentTime) / 1000 / 60
+    });
+  }
+  
+  return gaps;
+}
+```
+
+**Quick Fill Logic**:
+```javascript
+function handleQuickFill(timeBlock, category) {
+  // Create activity for the time block
+  const activityName = `${category} time`; // Generic name
+  
+  // Add to selectedFills
+  setSelectedFills(prev => ({
+    ...prev,
+    [timeBlock.id]: {
+      category,
+      activityName,
+      start_time: timeBlock.start,
+      end_time: timeBlock.end
+    }
+  }));
+}
+```
+
+**Save & Complete**:
+```javascript
+async function handleSaveAndComplete() {
+  // 1. Create activities for all selectedFills
+  for (const fill of Object.values(selectedFills)) {
+    await activityService.createActivity(fill);
+  }
+  
+  // 2. Update daily_challenge_metrics
+  await metricsService.calculateDailyMetrics(
+    challengeId,
+    todayDate
+  );
+  
+  // 3. Save mood, energy, notes
+  await metricsService.updateDailyContext(challengeId, todayDate, {
+    mood,
+    energy_level: energyLevel,
+    notes
+  });
+  
+  // 4. Mark day as complete (optional flag)
+  // 5. Show success message
+  // 6. Close modal
+}
+```
+
+### 8.3 Notification Integration
+
+#### Request Permission
+```javascript
+async function requestNotificationPermission() {
+  if ('Notification' in window) {
+    const permission = await Notification.requestPermission();
+    return permission === 'granted';
+  }
+  return false;
+}
+```
+
+#### Schedule Daily Reminder
+```javascript
+function scheduleDailyReminder(time) {
+  // Using service worker or scheduled notification
+  // Exact implementation depends on browser support
+  
+  // Simplified example:
+  const targetTime = new Date();
+  targetTime.setHours(time.hour, time.minute, 0);
+  
+  const now = new Date();
+  let delay = targetTime - now;
+  
+  if (delay < 0) {
+    // Already passed today, schedule for tomorrow
+    delay += 24 * 60 * 60 * 1000;
+  }
+  
+  setTimeout(() => {
+    new Notification('Time to review your day!', {
+      body: 'Let's log your activities and see how you did today.',
+      icon: '/icon.png'
+    });
+  }, delay);
+}
+```
+
+---
+
+## 9. Section 5: Heatmap Calendar Visualization
+
+### 9.1 Visual Design
+- Grid layout: weeks as rows, days as columns (Sun-Sat or Mon-Sun)
+- Each cell represents one day
+- Color intensity based on completion percentage
+- Hover shows detailed tooltip
+- Click opens day detail view
+
+### 9.2 Component: HeatmapCalendar.jsx
+
+#### Props
+```javascript
+{
+  challengeId: string,
+  startDate: Date,
+  endDate: Date,
+  currentDay: number
+}
+```
+
+#### State
+```javascript
+{
+  metrics: {
+    [dateString]: {
+      completion_pct: number,
+      consistency_score: number,
+      status: string,
+      commitments_status: object
+    }
+  },
+  hoveredDate: Date | null,
+  selectedDate: Date | null
+}
+```
+
+#### Data Fetching
+```javascript
+useEffect(() => {
+  async function loadMetrics() {
+    const { data } = await supabase
+      .from('daily_challenge_metrics')
+      .select('*')
+      .eq('challenge_id', challengeId)
+      .gte('date', startDate)
+      .lte('date', endDate);
+    
+    // Convert array to object keyed by date
+    const metricsMap = {};
+    data.forEach(metric => {
+      metricsMap[metric.date] = metric;
+    });
+    
+    setMetrics(metricsMap);
+  }
+  
+  loadMetrics();
+}, [challengeId, startDate, endDate]);
+```
+
+#### Color Logic
+```javascript
+function getColorForCompletion(completionPct) {
+  if (completionPct === null) return 'bg-gray-200'; // Future day
+  if (completionPct === 0) return 'bg-gray-300'; // Missed day
+  if (completionPct < 25) return 'bg-orange-200';
+  if (completionPct < 50) return 'bg-yellow-200';
+  if (completionPct < 75) return 'bg-green-200';
+  if (completionPct < 90) return 'bg-green-400';
+  return 'bg-green-600'; // 90-100%
+}
+```
+
+#### Rendering Logic
+```javascript
+function renderCalendar() {
+  const weeks = [];
+  let currentWeek = [];
+  let currentDate = new Date(startDate);
+  
+  // Pad start of first week if needed
+  const firstDayOfWeek = currentDate.getDay();
+  for (let i = 0; i < firstDayOfWeek; i++) {
+    currentWeek.push(<div key={`pad-${i}`} className="w-4 h-4" />);
+  }
+  
+  while (currentDate <= endDate) {
+    const dateString = currentDate.toISOString().split('T')[0];
+    const metric = metrics[dateString];
+    const completionPct = metric?.overall_completion_pct;
+    const color = getColorForCompletion(completionPct);
+    
+    currentWeek.push(
+      <div
+        key={dateString}
+        className={`w-4 h-4 ${color} rounded cursor-pointer`}
+        onMouseEnter={() => setHoveredDate(currentDate)}
+        onMouseLeave={() => setHoveredDate(null)}
+        onClick={() => setSelectedDate(currentDate)}
+      />
+    );
+    
+    // Start new week if Saturday
+    if (currentDate.getDay() === 6) {
+      weeks.push(<div key={weeks.length} className="flex gap-1">{currentWeek}</div>);
+      currentWeek = [];
+    }
+    
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+  
+  // Add remaining days in last week
+  if (currentWeek.length > 0) {
+    weeks.push(<div key={weeks.length} className="flex gap-1">{currentWeek}</div>);
+  }
+  
+  return weeks;
+}
+```
+
+#### Tooltip Component
+```javascript
+function Tooltip({ date, metric }) {
+  if (!date || !metric) return null;
+  
+  return (
+    <div className="absolute bg-white shadow-lg rounded p-3 z-50">
+      <div className="font-bold">Day {metric.day_number}/100</div>
+      <div>{date.toLocaleDateString()}</div>
+      <div className="mt-2">
+        <div>Completion: {metric.overall_completion_pct}%</div>
+        {Object.entries(metric.commitments_status).map(([id, status]) => (
+          <div key={id}>
+            {status.habit}: {status.completion_pct}%
+          </div>
+        ))}
+      </div>
+      {metric.notes && (
+        <div className="mt-2 text-sm text-gray-600">
+          Note: {metric.notes}
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## 10. Section 6: Dual-Ring Progress Indicators
+
+### 10.1 Concept
+Two concentric rings showing:
+- **Inner Ring (Blue)**: Consistency (did user show up?)
+- **Outer Ring (Green)**: Diligence (did user complete committed hours?)
+
+### 10.2 Component: DualRingProgress.jsx
+
+#### Props
+```javascript
+{
+  consistencyRate: number, // 0-100
+  diligenceRate: number,   // 0-100
+  size: number,            // Diameter in pixels
+  strokeWidth: number
+}
+```
+
+#### Calculation Logic
+```javascript
+// Consistency: Percentage of days with ANY activity in commitment categories
+function calculateConsistency(dailyMetrics) {
+  const totalDays = dailyMetrics.length;
+  const daysWithActivity = dailyMetrics.filter(
+    day => day.consistency_score > 0
+  ).length;
+  
+  return (daysWithActivity / totalDays) * 100;
+}
+
+// Diligence: Percentage of total committed time/goals achieved
+function calculateDiligence(dailyMetrics, challenge) {
+  let totalTargetHours = 0;
+  let totalActualHours = 0;
+  
+  dailyMetrics.forEach(day => {
+    challenge.commitments.forEach(commitment => {
+      if (commitment.unit === 'hours') {
+        totalTargetHours += commitment.target;
+        const status = day.commitments_status[commitment.id];
+        totalActualHours += status?.actual || 0;
+      }
+    });
+  });
+  
+  return (totalActualHours / totalTargetHours) * 100;
+}
+```
+
+#### SVG Rendering
+```javascript
+function DualRingProgress({ consistencyRate, diligenceRate, size = 200, strokeWidth = 20 }) {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  
+  // Inner ring (consistency)
+  const innerOffset = circumference - (consistencyRate / 100) * circumference;
+  
+  // Outer ring (diligence) - slightly larger radius
+  const outerRadius = radius + strokeWidth / 2 + 5;
+  const outerCircumference = 2 * Math.PI * outerRadius;
+  const outerOffset = outerCircumference - (diligenceRate / 100) * outerCircumference;
+  
+  return (
+    <svg width={size} height={size}>
+      {/* Background circles */}
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        stroke="#E5E7EB"
+        strokeWidth={strokeWidth}
+      />
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={outerRadius}
+        fill="none"
+        stroke="#E5E7EB"
+        strokeWidth={strokeWidth}
+      />
+      
+      {/* Inner ring (consistency - blue) */}
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        stroke="#3B82F6"
+        strokeWidth={strokeWidth}
+        strokeDasharray={circumference}
+        strokeDashoffset={innerOffset}
+        strokeLinecap="round"
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+      />
+      
+      {/* Outer ring (diligence - green) */}
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={outerRadius}
+        fill="none"
+        stroke="#10B981"
+        strokeWidth={strokeWidth}
+        strokeDasharray={outerCircumference}
+        strokeDashoffset={outerOffset}
+        strokeLinecap="round"
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+      />
+      
+      {/* Center text */}
+      <text
+        x={size / 2}
+        y={size / 2}
+        textAnchor="middle"
+        dominantBaseline="middle"
+        className="text-2xl font-bold"
+      >
+        {Math.round((consistencyRate + diligenceRate) / 2)}%
+      </text>
+    </svg>
+  );
+}
+```
+
+#### Legend Component
+```javascript
+function RingLegend() {
+  return (
+    <div className="flex gap-4 mt-2">
+      <div className="flex items-center gap-2">
+        <div className="w-4 h-4 bg-blue-500 rounded"></div>
+        <span>Consistency: {consistencyRate}%</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <div className="w-4 h-4 bg-green-500 rounded"></div>
+        <span>Diligence: {diligenceRate}%</span>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## 11. Section 7: Pattern Detection Engine
+
+### 11.1 Purpose
+Automatically detect behavioral patterns to provide personalized insights.
+
+### 11.2 Service: patternService.js
+
+#### Methods
+
+**detectWeakDays**
+```javascript
+async function detectWeakDays(challengeId) {
+  // Fetch all daily metrics
+  const { data: metrics } = await supabase
+    .from('daily_challenge_metrics')
+    .select('*')
+    .eq('challenge_id', challengeId);
+  
+  // Group by day of week
+  const byDayOfWeek = {
+    Sunday: [],
+    Monday: [],
+    Tuesday: [],
+    Wednesday: [],
+    Thursday: [],
+    Friday: [],
+    Saturday: []
+  };
+  
+  metrics.forEach(metric => {
+    byDayOfWeek[metric.day_of_week].push(metric.overall_completion_pct);
+  });
+  
+  // Calculate averages
+  const averages = {};
+  Object.keys(byDayOfWeek).forEach(day => {
+    const values = byDayOfWeek[day];
+    if (values.length > 0) {
+      averages[day] = values.reduce((a, b) => a + b, 0) / values.length;
+    }
+  });
+  
+  // Find weakest day (if significant)
+  const entries = Object.entries(averages);
+  entries.sort((a, b) => a[1] - b[1]);
+  
+  const weakestDay = entries[0];
+  
+  // Only consider it a pattern if sample size >= 3 and significantly lower
+  if (byDayOfWeek[weakestDay[0]].length >= 3 && weakestDay[1] < 70) {
+    await savePattern(challengeId, {
+      pattern_type: 'weak_day',
+      pattern_data: {
+        day: weakestDay[0],
+        avg_completion: weakestDay[1],
+        sample_size: byDayOfWeek[weakestDay[0]].length
+      },
+      confidence_score: Math.min(byDayOfWeek[weakestDay[0]].length * 10, 100)
+    });
+  }
+}
+```
+
+**detectStrongTimeBlocks**
+```javascript
+async function detectStrongTimeBlocks(challengeId, userId) {
+  // Fetch all activities for the challenge period
+  const { data: activities } = await supabase
+    .from('activities')
+    .select('*, category')
+    .eq('user_id', userId)
+    .eq('challenge_id', challengeId);
+  
+  // Focus on study/work categories (high-focus activities)
+  const focusActivities = activities.filter(
+    a => ['Study', 'Work', 'Deep Work'].includes(a.category)
+  );
+  
+  // Group by time blocks (3-hour windows)
+  const timeBlocks = {
+    'Early Morning (6-9am)': [],
+    'Morning (9am-12pm)': [],
+    'Afternoon (12-3pm)': [],
+    'Late Afternoon (3-6pm)': [],
+    'Evening (6-9pm)': [],
+    'Night (9pm-12am)': []
+  };
+  
+  focusActivities.forEach(activity => {
+    const hour = new Date(activity.start_time).getHours();
+    
+    if (hour >= 6 && hour < 9) timeBlocks['Early Morning (6-9am)'].push(activity);
+    else if (hour >= 9 && hour < 12) timeBlocks['Morning (9am-12pm)'].push(activity);
+    else if (hour >= 12 && hour < 15) timeBlocks['Afternoon (12-3pm)'].push(activity);
+    else if (hour >= 15 && hour < 18) timeBlocks['Late Afternoon (3-6pm)'].push(activity);
+    else if (hour >= 18 && hour < 21) timeBlocks['Evening (6-9pm)'].push(activity);
+    else if (hour >= 21 || hour < 6) timeBlocks['Night (9pm-12am)'].push(activity);
+  });
+  
+  // Calculate productivity metric (could be based on duration, completion, etc.)
+  const productivity = {};
+  Object.keys(timeBlocks).forEach(block => {
+    const activities = timeBlocks[block];
+    if (activities.length > 0) {
+      const avgDuration = activities.reduce((sum, a) => sum + a.duration_minutes, 0) / activities.length;
+      productivity[block] = {
+        avg_duration: avgDuration,
+        count: activities.length,
+        productivity_score: avgDuration * activities.length // Simple metric
+      };
+    }
+  });
+  
+  // Find strongest block
+  const entries = Object.entries(productivity);
+  entries.sort((a, b) => b[1].productivity_score - a[1
+
+  # Progressly App - Technical Specification (Part 2)
+
+## Continuation of Technical Upgrade Specification
+
+This document continues from Section 11 onwards. Reference the first artifact for Sections 1-10.
+
+---
+
+## 11. Section 7: Pattern Detection Engine (Continued)
+
+### 11.2 Service: patternService.js (Continued)
+
+#### detectStrongTimeBlocks (Complete)
+```javascript
+async function detectStrongTimeBlocks(challengeId, userId) {
+  // Fetch all activities for the challenge period
+  const { data: activities } = await supabase
+    .from('activities')
+    .select('*, category')
+    .eq('user_id', userId)
+    .eq('challenge_id', challengeId);
+  
+  // Focus on study/work categories (high-focus activities)
+  const focusActivities = activities.filter(
+    a => ['Study', 'Work', 'Deep Work'].includes(a.category)
+  );
+  
+  // Group by time blocks (3-hour windows)
+  const timeBlocks = {
+    'Early Morning (6-9am)': [],
+    'Morning (9am-12pm)': [],
+    'Afternoon (12-3pm)': [],
+    'Late Afternoon (3-6pm)': [],
+    'Evening (6-9pm)': [],
+    'Night (9pm-12am)': []
+  };
+  
+  focusActivities.forEach(activity => {
+    const hour = new Date(activity.start_time).getHours();
+    
+    if (hour >= 6 && hour < 9) timeBlocks['Early Morning (6-9am)'].push(activity);
+    else if (hour >= 9 && hour < 12) timeBlocks['Morning (9am-12pm)'].push(activity);
+    else if (hour >= 12 && hour < 15) timeBlocks['Afternoon (12-3pm)'].push(activity);
+    else if (hour >= 15 && hour < 18) timeBlocks['Late Afternoon (3-6pm)'].push(activity);
+    else if (hour >= 18 && hour < 21) timeBlocks['Evening (6-9pm)'].push(activity);
+    else if (hour >= 21 || hour < 6) timeBlocks['Night (9pm-12am)'].push(activity);
+  });
+  
+  // Calculate productivity metric
+  const productivity = {};
+  Object.keys(timeBlocks).forEach(block => {
+    const activities = timeBlocks[block];
+    if (activities.length > 0) {
+      const avgDuration = activities.reduce((sum, a) => sum + a.duration_minutes, 0) / activities.length;
+      productivity[block] = {
+        avg_duration: avgDuration,
+        count: activities.length,
+        productivity_score: avgDuration * activities.length
+      };
+    }
+  });
+  
+  // Find strongest block
+  const entries = Object.entries(productivity);
+  entries.sort((a, b) => b[1].productivity_score - a[1].productivity_score);
+  
+  const strongestBlock = entries[0];
+  
+  // Save pattern if significant (at least 5 sessions in that block)
+  if (strongestBlock && strongestBlock[1].count >= 5) {
+    await savePattern(challengeId, {
+      pattern_type: 'strong_time',
+      pattern_data: {
+        time_block: strongestBlock[0],
+        avg_duration: strongestBlock[1].avg_duration,
+        session_count: strongestBlock[1].count,
+        productivity_score: strongestBlock[1].productivity_score
+      },
+      confidence_score: Math.min(strongestBlock[1].count * 8, 100)
+    });
+  }
+}
+```
+
+#### calculateRecoverySpeed
+```javascript
+async function calculateRecoverySpeed(challengeId) {
+  const { data: metrics } = await supabase
+    .from('daily_challenge_metrics')
+    .select('*')
+    .eq('challenge_id', challengeId)
+    .order('date', { ascending: true });
+  
+  const recoveryGaps = [];
+  let consecutiveMisses = 0;
+  let missStartIndex = -1;
+  
+  metrics.forEach((metric, index) => {
+    if (metric.overall_completion_pct < 50) {
+      // Consider this a "miss"
+      if (consecutiveMisses === 0) {
+        missStartIndex = index;
+      }
+      consecutiveMisses++;
+    } else {
+      // Recovery day
+      if (consecutiveMisses > 0) {
+        recoveryGaps.push({
+          miss_duration: consecutiveMisses,
+          recovery_day: index
+        });
+        consecutiveMisses = 0;
+      }
+    }
+  });
+  
+  if (recoveryGaps.length > 0) {
+    const avgRecoveryTime = recoveryGaps.reduce((sum, gap) => sum + gap.miss_duration, 0) / recoveryGaps.length;
+    const fastestRecovery = Math.min(...recoveryGaps.map(g => g.miss_duration));
+    const slowestRecovery = Math.max(...recoveryGaps.map(g => g.miss_duration));
+    
+    await savePattern(challengeId, {
+      pattern_type: 'recovery_speed',
+      pattern_data: {
+        avg_days_to_recover: avgRecoveryTime,
+        fastest: fastestRecovery,
+        slowest: slowestRecovery,
+        recovery_count: recoveryGaps.length
+      },
+      confidence_score: Math.min(recoveryGaps.length * 15, 100)
+    });
+  }
+}
+```
+
+#### detectFailureTriggers
+```javascript
+async function detectFailureTriggers(challengeId, userId) {
+  // Fetch days with low completion
+  const { data: lowDays } = await supabase
+    .from('daily_challenge_metrics')
+    .select('*')
+    .eq('challenge_id', challengeId)
+    .lt('overall_completion_pct', 50);
+  
+  // Analyze common factors
+  const triggers = {
+    days_of_week: {},
+    mood_correlation: {},
+    energy_correlation: {}
+  };
+  
+  lowDays.forEach(day => {
+    // Day of week trigger
+    triggers.days_of_week[day.day_of_week] = 
+      (triggers.days_of_week[day.day_of_week] || 0) + 1;
+    
+    // Mood correlation
+    if (day.mood) {
+      triggers.mood_correlation[day.mood] = 
+        (triggers.mood_correlation[day.mood] || 0) + 1;
+    }
+    
+    // Energy correlation
+    if (day.energy_level) {
+      triggers.energy_correlation[day.energy_level] = 
+        (triggers.energy_correlation[day.energy_level] || 0) + 1;
+    }
+  });
+  
+  // Find most common trigger
+  const mostCommonDay = Object.entries(triggers.days_of_week)
+    .sort((a, b) => b[1] - a[1])[0];
+  
+  if (mostCommonDay && mostCommonDay[1] >= 3) {
+    await savePattern(challengeId, {
+      pattern_type: 'failure_trigger',
+      pattern_data: {
+        trigger_type: 'day_of_week',
+        value: mostCommonDay[0],
+        occurrence_count: mostCommonDay[1],
+        total_low_days: lowDays.length
+      },
+      confidence_score: Math.min((mostCommonDay[1] / lowDays.length) * 100, 100)
+    });
+  }
+}
+```
+
+#### savePattern
+```javascript
+async function savePattern(challengeId, patternData) {
+  // Check if pattern already exists
+  const { data: existing } = await supabase
+    .from('behavior_patterns')
+    .select('*')
+    .eq('challenge_id', challengeId)
+    .eq('pattern_type', patternData.pattern_type)
+    .single();
+  
+  if (existing) {
+    // Update existing pattern
+    await supabase
+      .from('behavior_patterns')
+      .update({
+        pattern_data: patternData.pattern_data,
+        confidence_score: patternData.confidence_score,
+        last_updated: new Date().toISOString()
+      })
+      .eq('id', existing.id);
+  } else {
+    // Insert new pattern
+    await supabase
+      .from('behavior_patterns')
+      .insert({
+        challenge_id: challengeId,
+        ...patternData
+      });
+  }
+}
+```
+
+#### getPatterns
+```javascript
+async function getPatterns(challengeId) {
+  const { data } = await supabase
+    .from('behavior_patterns')
+    .select('*')
+    .eq('challenge_id', challengeId)
+    .gte('confidence_score', 50) // Only return patterns with confidence >= 50
+    .order('confidence_score', { ascending: false });
+  
+  return data;
+}
+```
+
+### 11.3 Pattern Display Component
+
+#### Component: PatternInsights.jsx
+
+```javascript
+function PatternInsights({ challengeId }) {
+  const [patterns, setPatterns] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    async function loadPatterns() {
+      const data = await patternService.getPatterns(challengeId);
+      setPatterns(data);
+      setLoading(false);
+    }
+    
+    loadPatterns();
+  }, [challengeId]);
+  
+  if (loading) return <div>Loading insights...</div>;
+  if (patterns.length === 0) return <div>Not enough data yet for insights.</div>;
+  
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold">Your Patterns & Insights</h3>
+      
+      {patterns.map(pattern => (
+        <PatternCard key={pattern.id} pattern={pattern} />
+      ))}
+    </div>
+  );
+}
+
+function PatternCard({ pattern }) {
+  const getIcon = (type) => {
+    switch(type) {
+      case 'weak_day': return '⚠️';
+      case 'strong_time': return '🎯';
+      case 'recovery_speed': return '🏃';
+      case 'failure_trigger': return '⚡';
+      default: return '💡';
+    }
+  };
+  
+  const getMessage = (pattern) => {
+    const { pattern_type, pattern_data } = pattern;
+    
+    switch(pattern_type) {
+      case 'weak_day':
+        return `You're ${Math.round(100 - pattern_data.avg_completion)}% less productive on ${pattern_data.day}s (${pattern_data.sample_size} weeks analyzed)`;
+      
+      case 'strong_time':
+        return `Your peak productivity is during ${pattern_data.time_block} with average ${Math.round(pattern_data.avg_duration)} min sessions`;
+      
+      case 'recovery_speed':
+        return `When you miss a day, you typically recover within ${pattern_data.avg_days_to_recover.toFixed(1)} days. Your resilience is ${pattern_data.avg_days_to_recover < 2 ? 'excellent' : 'good'}!`;
+      
+      case 'failure_trigger':
+        return `${pattern_data.occurrence_count} of your low days happened on ${pattern_data.value}. This might be a trigger.`;
+      
+      default:
+        return 'Pattern detected';
+    }
+  };
+  
+  const getRecommendation = (pattern) => {
+    const { pattern_type, pattern_data } = pattern;
+    
+    switch(pattern_type) {
+      case 'weak_day':
+        return `Strategy: Front-load your work earlier in the week, or schedule lighter goals for ${pattern_data.day}s.`;
+      
+      case 'strong_time':
+        return `Recommendation: Schedule your most important work during ${pattern_data.time_block}.`;
+      
+      case 'recovery_speed':
+        return pattern_data.avg_days_to_recover < 2 
+          ? 'Keep it up! Your ability to bounce back quickly is a key success factor.'
+          : 'Focus on getting back on track within 24 hours after a miss.';
+      
+      case 'failure_trigger':
+        return 'Consider what typically happens on this day and plan accordingly.';
+      
+      default:
+        return '';
+    }
+  };
+  
+  return (
+    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+      <div className="flex items-start gap-3">
+        <span className="text-2xl">{getIcon(pattern.pattern_type)}</span>
+        <div className="flex-1">
+          <p className="font-medium text-gray-900">{getMessage(pattern)}</p>
+          <p className="text-sm text-gray-600 mt-1">{getRecommendation(pattern)}</p>
+          <div className="mt-2 flex items-center gap-2">
+            <div className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
+              {pattern.confidence_score}% confidence
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+### 11.4 Automatic Pattern Detection Trigger
+
+Run pattern detection:
+1. **After every 7 days** (weekly)
+2. **On-demand** when user opens analytics page
+3. **When challenge completes** (final analysis)
+
+```javascript
+// Scheduled pattern detection
+async function schedulePatternDetection(challengeId, userId) {
+  // Run all detection functions
+  await patternService.detectWeakDays(challengeId);
+  await patternService.detectStrongTimeBlocks(challengeId, userId);
+  await patternService.calculateRecoverySpeed(challengeId);
+  await patternService.detectFailureTriggers(challengeId, userId);
+}
+
+// Call this in useEffect with interval
+useEffect(() => {
+  const interval = setInterval(() => {
+    if (challenge && challenge.status === 'active') {
+      schedulePatternDetection(challenge.id, userId);
+    }
+  }, 7 * 24 * 60 * 60 * 1000); // Every 7 days
+  
+  return () => clearInterval(interval);
+}, [challenge, userId]);
+```
+
+---
+
+## 12. Section 8: AI Coach Enhancement
+
+### 12.1 Purpose
+Transform the basic AI chat into a context-aware performance coach that understands user's goals, patterns, and current state.
+
+### 12.2 Enhanced System Prompt
+
+```javascript
+const COACH_SYSTEM_PROMPT = `You are a personal performance coach and behavioral psychology expert specialized in consistency challenges and habit formation.
+
+CORE PRINCIPLES:
+1. NEVER use shame or guilt. Frame setbacks as data, not failures.
+2. ACTIVELY PREVENT ABSTINENCE VIOLATION EFFECT (AVE):
+   - When user misses days, provide external attribution
+   - Focus on next action, not past failure
+   - Emphasize that one miss doesn't define them
+3. IDENTITY REINFORCEMENT: Regularly reference their identity statement
+4. PATTERN-BASED ADVICE: Use their actual behavioral data
+5. CELEBRATE ASYMMETRICALLY: Big celebration for milestones and resilience
+
+RESPONSE STYLE:
+- Direct and actionable (not generic motivation)
+- Use specific numbers from their data
+- Ask clarifying questions when needed
+- Keep responses conversational but focused
+- Use emojis sparingly for emphasis
+
+YOU HAVE ACCESS TO:
+- User's challenge goals and commitments
+- Last 30 days of detailed activity logs
+- Detected behavioral patterns
+- Current consistency and diligence rates
+- Predicted weak points (days/times)
+- Recent notes and mood data
+
+AVOID:
+- Generic advice that could apply to anyone
+- Overwhelming with too many suggestions
+- Making the user feel bad about misses
+- Comparing them to others
+- Overpromising results`;
+```
+
+### 12.3 Context Building Function
+
+```javascript
+async function buildCoachContext(userId, challengeId) {
+  // 1. Get challenge details
+  const challenge = await challengeService.getChallengeById(challengeId);
+  
+  // 2. Get last 30 days of metrics
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  
+  const { data: recentMetrics } = await supabase
+    .from('daily_challenge_metrics')
+    .select('*')
+    .eq('challenge_id', challengeId)
+    .gte('date', thirtyDaysAgo.toISOString().split('T')[0])
+    .order('date', { ascending: false });
+  
+  // 3. Get today's progress
+  const today = new Date().toISOString().split('T')[0];
+  const todayMetric = recentMetrics.find(m => m.date === today);
+  
+  // 4. Get detected patterns
+  const patterns = await patternService.getPatterns(challengeId);
+  
+  // 5. Calculate current streaks
+  const currentStreak = calculateCurrentStreak(recentMetrics);
+  const longestStreak = calculateLongestStreak(recentMetrics);
+  
+  // 6. Build context string
+  const context = `
+USER CHALLENGE CONTEXT:
+Challenge: "${challenge.name}"
+Day: ${todayMetric?.day_number || '?'} of ${challenge.duration_days}
+Identity: "${challenge.identity_statement}"
+Why: "${challenge.why_statement}"
+
+COMMITMENTS:
+${challenge.commitments.map(c => 
+  `- ${c.habit}: ${c.target}${c.unit ? ' ' + c.unit : ''} ${c.frequency}`
+).join('\n')}
+
+CURRENT PERFORMANCE:
+- Overall consistency: ${calculateOverallConsistency(recentMetrics)}%
+- Overall diligence: ${calculateOverallDiligence(recentMetrics)}%
+- Current streak: ${currentStreak} days
+- Longest streak: ${longestStreak} days
+
+TODAY'S PROGRESS (so far):
+${todayMetric ? Object.entries(todayMetric.commitments_status).map(([id, status]) => {
+  const commitment = challenge.commitments.find(c => c.id === id);
+  return `- ${commitment.habit}: ${status.actual}/${status.target} (${status.completion_pct}%)`;
+}).join('\n') : 'No activities logged yet today'}
+
+LAST 7 DAYS SUMMARY:
+${recentMetrics.slice(0, 7).map(m => 
+  `Day ${m.day_number}: ${m.overall_completion_pct}% complete ${m.notes ? '- Note: ' + m.notes : ''}`
+).join('\n')}
+
+DETECTED PATTERNS:
+${patterns.length > 0 ? patterns.map(p => {
+  const data = p.pattern_data;
+  switch(p.pattern_type) {
+    case 'weak_day':
+      return `- Struggles on ${data.day}s (${data.avg_completion}% avg completion)`;
+    case 'strong_time':
+      return `- Most productive during ${data.time_block}`;
+    case 'recovery_speed':
+      return `- Recovers within ${data.avg_days_to_recover.toFixed(1)} days after setbacks`;
+    default:
+      return `- ${p.pattern_type} detected`;
+  }
+}).join('\n') : 'Not enough data for patterns yet'}
+
+RESPOND TO THE USER'S MESSAGE WITH THIS CONTEXT IN MIND.
+`;
+  
+  return context;
+}
+
+function calculateCurrentStreak(metrics) {
+  let streak = 0;
+  for (const metric of metrics) {
+    if (metric.overall_completion_pct >= 70) {
+      streak++;
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
+
+function calculateLongestStreak(metrics) {
+  let maxStreak = 0;
+  let currentStreak = 0;
+  
+  // Reverse to go chronologically
+  [...metrics].reverse().forEach(metric => {
+    if (metric.overall_completion_pct >= 70) {
+      currentStreak++;
+      maxStreak = Math.max(maxStreak, currentStreak);
+    } else {
+      currentStreak = 0;
+    }
+  });
+  
+  return maxStreak;
+}
+
+function calculateOverallConsistency(metrics) {
+  const daysWithActivity = metrics.filter(m => m.consistency_score > 0).length;
+  return Math.round((daysWithActivity / metrics.length) * 100);
+}
+
+function calculateOverallDiligence(metrics) {
+  const avgDiligence = metrics.reduce((sum, m) => sum + m.diligence_score, 0) / metrics.length;
+  return Math.round(avgDiligence);
+}
+```
+
+### 12.4 AI Service Enhancement
+
+```javascript
+// services/aiService.js
+
+async function sendMessageToCoach(userMessage, userId, challengeId) {
+  // Build context
+  const context = await buildCoachContext(userId, challengeId);
+  
+  // Combine system prompt + context + user message
+  const messages = [
+    {
+      role: "user",
+      content: context + "\n\nUSER MESSAGE: " + userMessage
+    }
+  ];
+  
+  // Call Anthropic API
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": process.env.ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01"
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1000,
+      system: COACH_SYSTEM_PROMPT,
+      messages: messages
+    })
+  });
+  
+  const data = await response.json();
+  
+  // Extract text from response
+  const assistantMessage = data.content
+    .filter(block => block.type === "text")
+    .map(block => block.text)
+    .join("\n");
+  
+  return assistantMessage;
+}
+```
+
+### 12.5 Enhanced AI Chat Component
+
+```javascript
+function AICoachChat({ challengeId, userId }) {
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [context, setContext] = useState(null);
+  
+  // Load context on mount
+  useEffect(() => {
+    async function loadContext() {
+      const ctx = await buildCoachContext(userId, challengeId);
+      setContext(ctx);
+    }
+    loadContext();
+  }, [userId, challengeId]);
+  
+  async function handleSend() {
+    if (!input.trim()) return;
+    
+    const userMessage = input.trim();
+    setInput('');
+    setLoading(true);
+    
+    // Add user message to chat
+    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    
+    try {
+      // Get AI response
+      const response = await aiService.sendMessageToCoach(
+        userMessage, 
+        userId, 
+        challengeId
+      );
+      
+      // Add AI response to chat
+      setMessages(prev => [...prev, { role: 'assistant', content: response }]);
+    } catch (error) {
+      console.error('AI error:', error);
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: 'Sorry, I encountered an error. Please try again.' 
+      }]);
+    } finally {
+      setLoading(false);
+    }
+  }
+  
+  return (
+    <div className="flex flex-col h-full">
+      {/* Context preview (optional, collapsible) */}
+      <div className="bg-blue-50 p-3 text-xs text-gray-600 border-b">
+        Coach has access to your goals, progress, and patterns
+      </div>
+      
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.length === 0 && (
+          <div className="text-center text-gray-500 mt-8">
+            <p className="text-lg mb-2">👋 Hi! I'm your performance coach.</p>
+            <p className="text-sm">I know your goals and can see your progress. What's on your mind?</p>
+          </div>
+        )}
+        
+        {messages.map((msg, idx) => (
+          <div
+            key={idx}
+            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+          >
+            <div
+              className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                msg.role === 'user'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-900'
+              }`}
+            >
+              {msg.content}
+            </div>
+          </div>
+        ))}
+        
+        {loading && (
+          <div className="flex justify-start">
+            <div className="bg-gray-100 rounded-lg px-4 py-2">
+              <div className="flex gap-1">
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+      
+      {/* Input */}
+      <div className="border-t p-4">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+            placeholder="Ask for advice, share how you're feeling..."
+            className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            disabled={loading}
+          />
+          <button
+            onClick={handleSend}
+            disabled={loading || !input.trim()}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Send
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+### 12.6 Quick Coach Insights
+
+Display AI-generated insight on dashboard without requiring user to ask.
+
+```javascript
+async function generateDailyInsight(userId, challengeId) {
+  const context = await buildCoachContext(userId, challengeId);
+  
+  const prompt = context + `\n\nGenerate a brief (2-3 sentences) insight or motivational message for today based on the user's recent performance. Focus on what they should focus on today.`;
+  
+  const response = await aiService.sendMessageToCoach(prompt, userId, challengeId);
+  
+  return response;
+}
+
+// Display component
+function DailyCoachInsight({ challengeId, userId }) {
+  const [insight, setInsight] = useState('');
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    async function loadInsight() {
+      const msg = await generateDailyInsight(userId, challengeId);
+      setInsight(msg);
+      setLoading(false);
+    }
+    loadInsight();
+  }, [userId, challengeId]);
+  
+  if (loading) return <div>Loading insight...</div>;
+  
+  return (
+    <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4 border border-blue-200">
+      <div className="flex items-start gap-3">
+        <span className="text-2xl">💡</span>
+        <div>
+          <p className="text-sm font-medium text-gray-900">{insight}</p>
+          <button className="text-xs text-blue-600 mt-2 hover:underline">
+            Chat with coach →
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## 13. Section 9: Voice Logging System
+
+### 13.1 Purpose
+Allow users to log activities by speaking instead of typing.
+
+### 13.2 Web Speech API Integration
+
+```javascript
+// services/voiceService.js
+
+class VoiceService {
+  constructor() {
+    this.recognition = null;
+    this.isListening = false;
+    
+    if ('webkitSpeechRecognition' in window) {
+      this.recognition = new webkitSpeechRecognition();
+      this.recognition.continuous = false;
+      this.recognition.interimResults = false;
+      this.recognition.lang = 'en-US'; // Can be changed to 'bn-BD' for Bengali
+    }
+  }
+  
+  isSupported() {
+    return this.recognition !== null;
+  }
+  
+  async startListening() {
+    if (!this.isSupported()) {
+      throw new Error('Speech recognition not supported in this browser');
+    }
+    
+    return new Promise((resolve, reject) => {
+      this.recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        resolve(transcript);
+      };
+      
+      this.recognition.onerror = (event) => {
+        reject(event.error);
+      };
+      
+      this.recognition.onend = () => {
+        this.isListening = false;
+      };
+      
+      this.isListening = true;
+      this.recognition.start();
+    });
+  }
+  
+  stopListening() {
+    if (this.recognition && this.isListening) {
+      this.recognition.stop();
+      this.isListening = false;
+    }
+  }
+  
+  setLanguage(lang) {
+    if (this.recognition) {
+      this.recognition.lang = lang;
+    }
+  }
+}
+
+export default new VoiceService();
+```
+
+### 13.3 Voice Input Parsing with AI
+
+```javascript
+async function parseVoiceInput(transcript, userId, categories) {
+  // Use AI to extract structured data from natural language
+  const prompt = `Parse this voice input into activity logging data.
+
+Available categories: ${categories.join(', ')}
+
+Voice input: "${transcript}"
+
+Extract and return a JSON array of activities with this structure:
+[
+  {
+    "activity_name": string,
+    "category": string (must be one of the available categories),
+    "start_time": ISO timestamp or "now" or relative like "2 hours ago",
+    "end_time": ISO timestamp or "now" or relative,
+    "duration_minutes": number (if explicit duration mentioned)
+  }
+]
+
+Examples:
+"I studied from 9am to 12pm" → [{"activity_name": "Study", "category": "Study", "start_time": "09:00", "end_time": "12:00"}]
+"I went running this morning" → [{"activity_name": "Running", "category": "Exercise", "start_time": "morning", "end_time": "morning", "duration_minutes": 30}]
+
+Return ONLY the JSON array, no other text.`;
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": process.env.ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01"
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 500,
+      messages: [{
+        role: "user",
+        content: prompt
+      }]
+    })
+  });
+  
+  const data = await response.json();
+  const text = data.content[0].text;
+  
+  // Parse JSON response
+  try {
+    const activities = JSON.parse(text);
+    return processActivities(activities);
+  } catch (error) {
+    console.error('Failed to parse AI response:', error);
+    throw new Error('Could not understand voice input');
+  }
+}
+
+function processActivities(activities) {
+  // Convert relative times to absolute timestamps
+  const now = new Date();
+  
+  return activities.map(activity => {
+    let startTime = activity.start_time;
+    let endTime = activity.end_time;
+    
+    // Handle relative times
+    if (startTime === 'morning') {
+      startTime = new Date(now);
+      startTime.setHours(7, 0, 0);
+    } else if (startTime === 'afternoon') {
+      startTime = new Date(now);
+      startTime.setHours(14, 0, 0);
+    } else if (startTime === 'evening') {
+      startTime = new Date(now);
+      startTime.setHours(18, 0, 0);
+    } else if (startTime === 'now') {
+      startTime = now;
+    } else if (startTime.includes('ago')) {
+      // Parse "2 hours ago"
+      const match = startTime.match(/(\d+)\s*(hour|minute)s?\s*ago/);
+      if (match) {
+        const value = parseInt(match[1]);
+        const unit = match[2];
+        startTime = new Date(now);
+        if (unit === 'hour') {
+          startTime.setHours(startTime.getHours() - value);
+        } else {
+          startTime.setMinutes(startTime.getMinutes() - value);
+        }
+      }
+    } else {
+      // Try to parse as time string "09:00"
+      const [hours, minutes] = startTime.split(':').map(Number);
+      if (!isNaN(hours)) {
+        startTime = new Date(now);
+        startTime.setHours(hours, minutes || 0, 0);
+      }
+    }
+    
+    // Similar processing for endTime
+    if (endTime === 'now') {
+      endTime = now;
+    } else if (endTime === startTime) {
+      // If end equals start, add duration
+      endTime = new Date(startTime);
+      endTime.setMinutes(endTime.getMinutes() + (activity.duration_minutes || 30));
+    } else {
+      const [hours, minutes] = endTime.split(':').map(Number);
+      if (!isNaN(hours)) {
+        endTime = new Date(now);
+        endTime.setHours(hours, minutes || 0, 0);
+      }
+    }
+    
+    return {
+      ...activity,
+      start_time: startTime,
+      end_time: endTime
+    };
+  });
+}
+```
+
+### 13.4 Voice Logging Component
+
+```javascript
+function VoiceLogging({ onActivitiesLogged, categories }) {
+  const [isListening, setIsListening] = useState(false);
+  const [transcript, setTranscript] = useState('');
+  const [parsedActivities, setParsedActivities] = useState([]);
+  const [error, setError] = useState('');
+  const [language, setLanguage] = useState('en-US');
+  
+  const handleStartListening = async () => {
+    setError('');
+    setTranscript('');
+    setIsListening(true);
+    
+    try {
+      voiceService.setLanguage(language);
+      const text = await voiceService.startListening();
+      setTranscript(text);
+      setIsListening(false);
+      
+      // Parse with AI
+      const activities = await parseVoiceInput(text, userId, categories);
+      setParsedActivities(activities);
+    } catch (err) {
+      setError(err.message);
+      setIsListening(false);
+    }
+  };
+  
+  const handleStopListening = () => {
+    voiceService.stopListening();
+    setIsListening(false);
+  };
+  
+  const handleConfirm = async () => {
+    // Save all activities
+    for (const activity of parsedActivities) {
+      await activityService.createActivity({
+        user_id: userId,
+        name: activity.activity_name,
+        category: activity.category,
+        start_time: activity.start_time,
+        end_time: activity.end_time,
+        duration_minutes: (activity.end_time - activity.start_time) / 1000 / 60,
+        is_auto_logged: true
+      });
+    }
+    
+    onActivitiesLogged(parsedActivities);
+    
+    // Reset
+    setTranscript('');
+    setParsedActivities([]);
+  };
+  
+  const handleEdit = (index, field, value) => {
+    setParsedActivities(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
+  
+  return (
+    <div className="space-y-4">
+      {/* Language selector */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setLanguage('en-US')}
+          className={`px-3 py-1 rounded ${language === 'en-US' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+        >
+          English
+        </button>
+        <button
+          onClick={() => setLanguage('bn-BD')}
+          className={`px-3 py-1 rounded ${language === 'bn-BD' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+        >
+          বাংলা
+        </button>
+      </div>
+      
+      {/* Voice input button */}
+      <div className="flex flex-col items-center gap-4">
+        <button
+          onClick={isListening ? handleStopListening : handleStartListening}
+          disabled={!voiceService.isSupported()}
+          className={`w-24 h-24 rounded-full flex items-center justify-center text-white text-3xl transition-all ${
+            isListening 
+              ? 'bg-red-500 animate-pulse' 
+              : 'bg-blue-600 hover:bg-blue-700'
+          } disabled:opacity-50 disabled:cursor-not-allowed`}
+        >
+          {isListening ? '⏹️' : '🎤'}
+        </button>
+        
+        <p className="text-sm text-gray-600">
+          {isListening ? 'Listening... Speak now' : 'Tap to start voice logging'}
+        </p>
+        
+        {!voiceService.isSupported() && (
+          <p className="text-sm text-red-600">
+            Voice input not supported in this browser
+          </p>
+        )}
+      </div>
+      
+      {/* Transcript */}
+      {transcript && (
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <p className="text-sm text-gray-600 mb-1">You said:</p>
+          <p className="font-medium">"{transcript}"</p>
+        </div>
+      )}
+      
+      {/* Parsed activities */}
+      {parsedActivities.length > 0 && (
+        <div className="space-y-3">
+          <p className="text-sm font-medium">Confirm activities:</p>
+          
+          {parsedActivities.map((activity, idx) => (
+            <div key={idx} className="bg-white border rounded-lg p-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-600">Activity</label>
+                  <input
+                    type="text"
+                    value={activity.activity_name}
+                    onChange={(e) => handleEdit(idx, 'activity_name', e.target.value)}
+                    className="w-full px-2 py-1 border rounded mt-1"
+                  />
+                </div>
+                
+                <div>
+                  <label className="text-xs text-gray-600">Category</label>
+                  <select
+                    value={activity.category}
+                    onChange={(e) => handleEdit(idx, 'category', e.target.value)}
+                    className="w-full px-2 py-1 border rounded mt-1"
+                  >
+                    {categories.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="text-xs text-gray-600">Start Time</label>
+                  <input
+                    type="time"
+                    value={formatTimeForInput(activity.start_time)}
+                    onChange={(e) => handleEdit(idx, 'start_time', parseTimeInput(e.target.value))}
+                    className="w-full px-2 py-1 border rounded mt-1"
+                  />
+                </div>
+                
+                <div>
+                  <label className="text-xs text-gray-600">End Time</label>
+                  <input
+                    type="time"
+                    value={formatTimeForInput(activity.end_time)}
+                    onChange={(e) => handleEdit(idx, 'end_time', parseTimeInput(e.target.value))}
+                    className="w-full px-2 py-1 border rounded mt-1"
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+          
+          <div className="flex gap-2">
+            <button
+              onClick={handleConfirm}
+              className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700"
+            >
+              ✓ Confirm & Save
+            </button>
+            <button
+              onClick={() => setParsedActivities([])}
+              className="px-4 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+      
+      {/* Error */}
+      {error && (
+        <div className="bg-red-50 text-red-700 p-3 rounded-lg text-sm">
+          {error}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function formatTimeForInput(date) {
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
+function parseTimeInput(timeString) {
+  const [hours, minutes] = timeString.split(':').map(Number);
+  const date = new Date();
+  date.setHours(hours, minutes, 0, 0);
+  return date;
+}
+```
+
+---
+
+## 14. Section 10: Analytics & Insights Dashboard
+
+### 14.1 Purpose
+Comprehensive view of performance trends, patterns, and progress over time.
+
+### 14.2 Component: AnalyticsDashboard.jsx
+
+```javascript
+function AnalyticsDashboard({ challengeId, userId }) {
+  const [metrics, setMetrics] = useState([]);
+  const [patterns, setPatterns] = useState([]);
+  const [selectedView, setSelectedView] = useState('overview'); // 'overview', 'trends', 'patterns', 'comparison'
+  
+  useEffect(() => {
+    async function loadData() {
+      const [metricsData, patternsData] = await Promise.all([
+        metricsService.getAllMetrics(challengeId),
+        patternService.getPatterns(challengeId)
+      ]);
+      
+      setMetrics(metricsData);
+      setPatterns(patternsData);
+    }
+    
+    loadData();
+  }, [challengeId]);
+  
+  return (
+    <div className="space-y-6">
+      {/* View selector */}
+      <div className="flex gap-2 border-b">
+        {['overview', 'trends', 'patterns', 'comparison'].map(view => (
+          <button
+            key={view}
+            onClick={() => setSelectedView(view)}
+            className={`px-4 py-2 border-b-2 ${
+              selectedView === view
+                ? 'border-blue-600 text-blue-600 font-medium'
+                : 'border-transparent text-gray-600'
+            }`}
+          >
+            {view.charAt(0).toUpperCase() + view.slice(1)}
+          </button>
+        ))}
+      </div>
+      
+      {/* Content */}
+      {selectedView === 'overview' && <OverviewTab metrics={metrics} />}
+      {selectedView === 'trends' && <TrendsTab metrics={metrics} />}
+      {selectedView === 'patterns' && <PatternsTab patterns={patterns} />}
+      {selectedView === 'comparison' && <ComparisonTab metrics={metrics} challengeId={challengeId} />}
+    </div>
+  );
+}
+```
+
+### 14.3 Overview Tab
+
+```javascript
+function OverviewTab({ metrics }) {
+  // Calculate key stats
+  const totalDays = metrics.length;
+  const completedDays = metrics.filter(m => m.overall_completion_pct >= 70).length;
+  const consistencyRate = (completedDays / totalDays) * 100;
+  
+  const avgCompletion = metrics.reduce((sum, m) => sum + m.overall_completion_pct, 0) / totalDays;
+  
+  const currentStreak = calculateCurrentStreak(metrics);
+  const longestStreak = calculateLongestStreak(metrics);
+  
+  const totalHoursLogged = metrics.reduce((sum, m) => {
+    return sum + Object.values(m.commitments_status).reduce((s, c) => 
+      s + (c.unit === 'hours' ? c.actual : 0), 0
+    );
+  }, 0);
+  
+  return (
+    <div className="space-y-6">
+      {/* Key metrics cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <MetricCard
+          title="Consistency"
+          value={`${Math.round(consistencyRate)}%`}
+          subtitle={`${completedDays}/${totalDays} days`}
+          icon="🎯"
+          color="blue"
+        />
+        
+        <MetricCard
+          title="Avg Completion"
+          value={`${Math.round(avgCompletion)}%`}
+          subtitle="Daily average"
+          icon="📊"
+          color="green"
+        />
+        
+        <MetricCard
+          title="Current Streak"
+          value={`${currentStreak}`}
+          subtitle={`Longest: ${longestStreak}`}
+          icon="🔥"
+          color="orange"
+        />
+        
+        <MetricCard
+          title="Total Hours"
+          value={Math.round(totalHoursLogged)}
+          subtitle="Logged so far"
+          icon="⏱️"
+          color="purple"
+        />
+      </div>
+      
+      {/* Progress chart */}
+      <div className="bg-white rounded-lg border p-6">
+        <h3 className="text-lg font-semibold mb-4">Daily Completion Trend</h3>
+        <CompletionLineChart metrics={metrics} />
+      </div>
+      
+      {/* Category breakdown */}
+      <div className="bg-white rounded-lg border p-6">
+        <h3 className="text-lg font-semibold mb-4">Time by Category</h3>
+        <CategoryBarChart metrics={metrics} />
+      </div>
+    </div>
+  );
+}
+
+function MetricCard({ title, value, subtitle, icon, color }) {
+  const colorClasses = {
+    blue: 'bg-blue-50 text-blue-600 border-blue-200',
+    green: 'bg-green-50 text-green-600 border-green-200',
+    orange: 'bg-orange-50 text-orange-600 border-orange-200',
+    purple: 'bg-purple-50 text-purple-600 border-purple-200'
+  };
+  
+  return (
+    <div className={`rounded-lg border p-4 ${colorClasses[color]}`}>
+      <div className="text-2xl mb-2">{icon}</div>
+      <div className="text-2xl font-bold">{value}</div>
+      <div className="text-sm font-medium">{title}</div>
+      <div className="text-xs opacity-75 mt-1">{subtitle}</div>
+    </div>
+  );
+}
+```
+
+### 14.4 Trends Tab with Charts
+
+```javascript
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+
+function TrendsTab({ metrics }) {
+  // Prepare data for charts
+  const chartData = metrics.map(m => ({
+    day: m.day_number,
+    completion: m.overall_completion_pct,
+    consistency: m.consistency_score,
+    diligence: m.diligence_score
+  }));
+  
+  // Rolling average (7-day)
+  const rollingAvg = chartData.map((point, idx) => {
+    const start = Math.max(0, idx - 6);
+    const window = chartData.slice(start, idx + 1);
+    const avg = window.reduce((sum, p) => sum + p.completion, 0) / window.length;
+    return { ...point, rolling_avg: avg };
+  });
+  
+  return (
+    <div className="space-y-6">
+      {/* Completion over time */}
+      <div className="bg-white rounded-lg border p-6">
+        <h3 className="text-lg font-semibold mb-4">Completion Rate Over Time</h3>
+        <ResponsiveContainer width="100%" height={300}>
+          <LineChart data={rollingAvg}>
+            <XAxis dataKey="day" label={{ value: 'Day', position: 'insideBottom', offset: -5 }} />
+            <YAxis label={{ value: 'Completion %', angle: -90, position: 'insideLeft' }} />
+            <Tooltip />
+            <Line type="monotone" dataKey="completion" stroke="#3B82F6" strokeWidth={2} dot={false} name="Daily" />
+            <Line type="

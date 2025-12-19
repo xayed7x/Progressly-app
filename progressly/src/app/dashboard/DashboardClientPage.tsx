@@ -5,7 +5,7 @@ import { Suspense, useState, useEffect, useMemo } from 'react';
 import { getSupabaseBrowserClient } from '@/lib/supabase-client';
 import type { User } from '@supabase/supabase-js';
 import useSWR from 'swr';
-import { isToday, subDays, parseISO, addDays } from 'date-fns';
+import { isToday, subDays, parseISO, addDays, format } from 'date-fns';
 
 import ActivityLogger from './_components/ActivityLogger';
 import { ActivitiesWrapper } from './_components/ActivitiesWrapper';
@@ -50,6 +50,7 @@ export default function DashboardClientPage({
   const [user, setUser] = useState<User | null>(null);
   const [isUserLoading, setIsUserLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);  // Initialize from effective_date
+  const [endedDate, setEndedDate] = useState<string | null>(null);  // Track which date was ended
   const [optimisticActivities, setOptimisticActivities] = useState<
     ActivityReadWithCategory[]
   >([]);
@@ -112,47 +113,33 @@ export default function DashboardClientPage({
     {
       revalidateOnFocus: true, // Refresh when window regains focus
       revalidateOnReconnect: true, // Refresh when network reconnects
+      revalidateOnMount: true, // Always revalidate on mount
+      dedupingInterval: 0, // Don't dedupe requests - always fetch fresh
     }
   );
 
   // Track if we've already initialized from localStorage
   const [dateInitialized, setDateInitialized] = useState(false);
 
-  // FIRST: Check localStorage on mount (runs once)
-  useEffect(() => {
-    if (dateInitialized) return;
-    
-    const manualDayEnd = localStorage.getItem('progressly_manual_day_end');
-    if (manualDayEnd) {
-      try {
-        const { date, endedAt } = JSON.parse(manualDayEnd);
-        const endedAtTime = new Date(endedAt).getTime();
-        const now = Date.now();
-        const hoursAgo = (now - endedAtTime) / (1000 * 60 * 60);
-        
-        if (hoursAgo < 24) {
-          console.log('[Progressly] Using manual day end from localStorage:', date);
-          setSelectedDate(parseISO(date));
-          setDateInitialized(true);
-          return;
-        } else {
-          // Clear stale manual day end
-          localStorage.removeItem('progressly_manual_day_end');
-        }
-      } catch (e) {
-        localStorage.removeItem('progressly_manual_day_end');
-      }
-    }
-  }, [dateInitialized]);
+  // localStorage is now only used as a fallback during the same session
+  // For cross-device sync, backend user_sessions table is authoritative
 
-  // SECOND: Use backend effective_date only if not already initialized
+  // PRIORITY 1: Use backend effective_date (from user_sessions table) - this is authoritative for cross-device sync
   useEffect(() => {
-    if (bootstrapData?.effective_date && selectedDate === null && !dateInitialized) {
-      console.log('[Progressly] Using effective_date from backend:', bootstrapData.effective_date);
+    if (bootstrapData?.effective_date && !dateInitialized) {
+      console.log('[Progressly] Using effective_date from backend (cross-device sync):', bootstrapData.effective_date);
       setSelectedDate(parseISO(bootstrapData.effective_date));
       setDateInitialized(true);
+      
+      // Also update localStorage to match backend
+      const storageData = {
+        date: bootstrapData.effective_date,
+        endedAt: new Date().toISOString(),
+        endedDateStr: ''  // Unknown since we're loading from backend
+      };
+      localStorage.setItem('progressly_manual_day_end', JSON.stringify(storageData));
     }
-  }, [bootstrapData?.effective_date, selectedDate, dateInitialized]);
+  }, [bootstrapData?.effective_date, dateInitialized]);
 
   const sortedCategories = useMemo(() => {
     if (!bootstrapData?.categories) return [];
@@ -184,13 +171,24 @@ export default function DashboardClientPage({
   // Memoize filtered activities for the selected date
   const activitiesForSelectedDate = useMemo(() => {
     if (!bootstrapData || !selectedDate) return [];
+    // Use format() for consistent local date - avoids timezone issues with toISOString()
+    const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
+    
+    console.log('[Progressly] Filtering activities for date:', selectedDateStr);
+    
     return bootstrapData.activities_last_3_days.filter(act => {
-      // Safety check: ensure activity_date exists
-      if (!act.activity_date) return false;
+      // Use effective_date if available (psychological day), fallback to activity_date
+      if (act.effective_date) {
+        // effective_date is already in YYYY-MM-DD format from backend
+        const match = act.effective_date === selectedDateStr;
+        if (match) console.log('[Progressly] Activity matched:', act.activity_name, 'effective_date:', act.effective_date);
+        return match;
+      }
       
-      // Important: Compare dates without time component
-      const activityDate = parseISO(act.activity_date).toDateString();
-      return activityDate === selectedDate.toDateString();
+      // Fallback for old activities without effective_date
+      if (!act.activity_date) return false;
+      const activityDate = format(parseISO(act.activity_date), 'yyyy-MM-dd');
+      return activityDate === selectedDateStr;
     });
   }, [bootstrapData, selectedDate]);
 
@@ -250,15 +248,50 @@ export default function DashboardClientPage({
   };
 
   // Manual day advancement - for when user forgets to log sleep
-  const handleEndDay = () => {
+  const handleEndDay = async () => {
     if (selectedDate) {
+      // Use format() for consistent local date - avoid timezone issues with toISOString()
+      const endedDateStr = format(selectedDate, 'yyyy-MM-dd'); // The date being ended
       const nextDay = addDays(selectedDate, 1);
+      const nextDayStr = format(nextDay, 'yyyy-MM-dd'); // The new current date
+      
+      console.log('[Progressly] End My Day clicked - ending:', endedDateStr, 'advancing to:', nextDayStr);
+      
+      // Mark this date as ended (locks the button)
+      setEndedDate(endedDateStr);
+      
+      // Update UI immediately
       setSelectedDate(nextDay);
-      // Save to localStorage so it persists on refresh
-      localStorage.setItem('progressly_manual_day_end', JSON.stringify({
-        date: nextDay.toISOString().split('T')[0],
-        endedAt: new Date().toISOString()
-      }));
+      
+      // Save to localStorage FIRST (most reliable)
+      const storageData = {
+        date: nextDayStr,
+        endedAt: new Date().toISOString(),
+        endedDateStr: endedDateStr
+      };
+      localStorage.setItem('progressly_manual_day_end', JSON.stringify(storageData));
+      console.log('[Progressly] Saved to localStorage:', storageData);
+      
+      // Save to backend for cross-device sync
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          const response = await fetch(`${API_BASE_URL}/api/end-day`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ new_effective_date: nextDayStr }),
+          });
+          
+          if (response.ok) {
+            console.log('[Progressly] End Day saved to backend for cross-device sync');
+          }
+        }
+      } catch (error) {
+        console.error('[Progressly] Failed to save End Day to backend:', error);
+      }
     }
   };
 
@@ -352,6 +385,7 @@ export default function DashboardClientPage({
                 onEndDay={handleEndDay}
                 isPreviousDisabled={isPreviousDisabled}
                 isNextDisabled={isNextDisabled}
+                isDayEnded={endedDate === selectedDate.toISOString().split('T')[0]}
               />
 
               <div className="w-full max-w-lg bg-secondary/40 p-4 rounded-lg">

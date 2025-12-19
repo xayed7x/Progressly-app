@@ -1,5 +1,5 @@
 # progressly-api/models.py
-from datetime import datetime, time
+from datetime import datetime, time, date
 from typing import Optional, List
 from sqlmodel import Field, SQLModel, Relationship
 from sqlalchemy import UniqueConstraint
@@ -62,6 +62,10 @@ class LoggedActivity(LoggedActivityBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: str = Field(index=True)
     activity_date: datetime = Field(default_factory=datetime.utcnow, nullable=False)
+    
+    # NEW: The "psychological day" this activity belongs to (wake-up to wake-up cycle)
+    # This is the effective date for goals, heatmaps, and analytics - indexed for fast queries
+    effective_date: Optional[date] = Field(default=None, index=True)
 
     # NEW: This is the foreign key that links this activity to a specific category.
     category_id: Optional[int] = Field(default=None, foreign_key="category.id")
@@ -83,7 +87,8 @@ class ActivityCreate(SQLModel):
 class ActivityRead(LoggedActivityBase):
     id: int
     user_id: str
-    activity_date: datetime  # Include activity_date for frontend
+    activity_date: datetime  # Calendar timestamp (UTC)
+    effective_date: Optional[date] = None  # Psychological day for this activity
     category_id: Optional[int]
 
 class ActivityReadWithCategory(ActivityRead):
@@ -125,3 +130,17 @@ class Message(SQLModel, table=True):
     content: str
     created_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
     conversation: Optional[Conversation] = Relationship(back_populates="messages")
+
+
+# --- User Session Model (for End My Day state) ---
+class UserSession(SQLModel, table=True):
+    """
+    Tracks the user's current psychological day session.
+    Used for cross-device sync of "End My Day" state.
+    """
+    __tablename__ = "user_sessions"
+    
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: str = Field(unique=True, index=True)  # One session per user
+    current_effective_date: date  # The user's current psychological day
+    ended_at: datetime = Field(default_factory=datetime.utcnow)  # When they ended the day

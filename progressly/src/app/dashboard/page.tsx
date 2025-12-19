@@ -6,7 +6,10 @@ import type { Database } from '@/lib/types_db';
 import DashboardClientPage from "./DashboardClientPage";
 
 export default async function DashboardPage() {
-  const supabase = createServerComponentClient<Database>({ cookies: () => cookies() });
+  const cookieStore = await cookies();
+  const supabase = createServerComponentClient<Database>({ 
+    cookies: () => cookieStore as any 
+  });
   const { data: { session } } = await supabase.auth.getSession();
 
   if (!session) {
