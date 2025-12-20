@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, select
+from sqlmodel import Session, select, SQLModel
 from typing import Annotated, Optional, List
 from datetime import datetime
 from uuid import UUID
@@ -9,6 +9,10 @@ from models import Challenge, ChallengeCreate
 
 router = APIRouter()
 DBSession = Annotated[Session, Depends(get_db_session)]
+
+class ChallengeUpdate(SQLModel):
+    name: Optional[str] = None
+    commitments: Optional[List[dict]] = None
 
 @router.post("/api/challenges", response_model=Challenge)
 def create_challenge(
@@ -62,6 +66,66 @@ def get_active_challenge(db: DBSession, user_id: str = Depends(get_current_user)
     except Exception as e:
         print(f"ERROR getting active challenge: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch active challenge")
+
+@router.put("/api/challenges/{challenge_id}", response_model=Challenge)
+def update_challenge(
+    challenge_id: UUID, 
+    challenge_update: ChallengeUpdate,
+    db: DBSession, 
+    user_id: str = Depends(get_current_user)
+):
+    """Update a challenge (name, commitments, etc.)."""
+    try:
+        challenge = db.get(Challenge, challenge_id)
+        if not challenge:
+            raise HTTPException(status_code=404, detail="Challenge not found")
+            
+        if challenge.user_id != user_id:
+            raise HTTPException(status_code=403, detail="Not authorized")
+        
+        # Update fields if provided
+        if challenge_update.name is not None:
+            challenge.name = challenge_update.name
+        if challenge_update.commitments is not None:
+            challenge.commitments = challenge_update.commitments
+        
+        challenge.updated_at = datetime.utcnow()
+        db.add(challenge)
+        db.commit()
+        db.refresh(challenge)
+        return challenge
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"ERROR updating challenge: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update challenge")
+
+@router.post("/api/challenges/{challenge_id}/abandon")
+def abandon_challenge(
+    challenge_id: UUID, 
+    db: DBSession, 
+    user_id: str = Depends(get_current_user)
+):
+    """Abandon a challenge (mark as abandoned)."""
+    try:
+        challenge = db.get(Challenge, challenge_id)
+        if not challenge:
+            raise HTTPException(status_code=404, detail="Challenge not found")
+            
+        if challenge.user_id != user_id:
+            raise HTTPException(status_code=403, detail="Not authorized")
+        
+        challenge.status = "abandoned"
+        challenge.updated_at = datetime.utcnow()
+        db.add(challenge)
+        db.commit()
+        
+        return {"success": True, "message": "Challenge abandoned"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"ERROR abandoning challenge: {e}")
+        raise HTTPException(status_code=500, detail="Failed to abandon challenge")
 
 @router.delete("/api/challenges/{challenge_id}")
 def delete_challenge(

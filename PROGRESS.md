@@ -171,6 +171,17 @@ Transformed QuickTapLogging from a static demo into a fully functional feature.
 
 ## Session Log
 
+### Dec 20, 2025 (Session 4 - Settings Page)
+- ✅ Created unified Settings page (`/settings`) with 4 tabs
+- ✅ Tab 1: Account - Profile info, Logout
+- ✅ Tab 2: Challenge - View/Edit name, Commitments, Abandon
+- ✅ Tab 3: Categories - Full CRUD with delete confirmation
+- ✅ Tab 4: Goals & Targets - Big Goal + Daily Targets
+- ✅ Created `/settings/actions.ts` with all server actions
+- ✅ Added PUT/DELETE endpoints for categories (backend)
+- ✅ Added PUT/Abandon endpoints for challenges (backend)
+- ✅ Replaces separate `/goals` and `/account` pages
+
 ### Dec 20, 2025 (Session 3 - QuickTap Enhancement)
 - ✅ Rewrote QuickTapLogging with dynamic categories
 - ✅ Integrated logActivity server action (saves to DB)
