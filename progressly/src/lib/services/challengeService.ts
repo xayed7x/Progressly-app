@@ -10,7 +10,9 @@ import type {
   ChallengeStatus 
 } from '@/lib/types';
 
-const supabase = getSupabaseBrowserClient();
+// Cast as any to bypass TypeScript checking for new tables
+// TODO: Regenerate Supabase types after running migrations
+const supabase: any = getSupabaseBrowserClient();
 
 /**
  * Create a new challenge
@@ -25,7 +27,7 @@ export async function createChallenge(
   endDate.setDate(endDate.getDate() + input.duration_days - 1);
 
   const { data, error } = await supabase
-    .from('challenges')
+    .from('challenges' as any)
     .insert({
       user_id: userId,
       name: input.name,
@@ -38,7 +40,7 @@ export async function createChallenge(
       obstacle_prediction: input.obstacle_prediction || null,
       success_threshold: input.success_threshold || 70,
       status: 'active'
-    })
+    } as any)
     .select()
     .single();
 
@@ -47,10 +49,12 @@ export async function createChallenge(
     throw new Error(error.message);
   }
 
-  // Initialize first day metrics
-  await initializeDayMetrics(data.id, input.start_date, 1);
+  const challengeData = data as any;
 
-  return data as Challenge;
+  // Initialize first day metrics
+  await initializeDayMetrics(challengeData.id, input.start_date, 1);
+
+  return challengeData as Challenge;
 }
 
 /**
@@ -60,7 +64,7 @@ export async function getActiveChallenge(
   userId: string
 ): Promise<Challenge | null> {
   const { data, error } = await supabase
-    .from('challenges')
+    .from('challenges' as any)
     .select('*')
     .eq('user_id', userId)
     .eq('status', 'active')
@@ -87,7 +91,7 @@ export async function getChallengeById(
   challengeId: string
 ): Promise<Challenge | null> {
   const { data, error } = await supabase
-    .from('challenges')
+    .from('challenges' as any)
     .select('*')
     .eq('id', challengeId)
     .single();
@@ -110,7 +114,7 @@ export async function getUserChallenges(
   userId: string
 ): Promise<Challenge[]> {
   const { data, error } = await supabase
-    .from('challenges')
+    .from('challenges' as any)
     .select('*')
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
@@ -131,8 +135,8 @@ export async function updateChallenge(
   updates: Partial<Omit<Challenge, 'id' | 'user_id' | 'created_at'>>
 ): Promise<Challenge> {
   const { data, error } = await supabase
-    .from('challenges')
-    .update(updates)
+    .from('challenges' as any)
+    .update(updates as any)
     .eq('id', challengeId)
     .select()
     .single();
@@ -200,7 +204,7 @@ async function initializeDayMetrics(
   const dayOfWeek = new Date(date).toLocaleDateString('en-US', { weekday: 'long' });
   
   const { error } = await supabase
-    .from('daily_challenge_metrics')
+    .from('daily_challenge_metrics' as any)
     .insert({
       challenge_id: challengeId,
       date: date,
@@ -212,7 +216,7 @@ async function initializeDayMetrics(
       cumulative_consistency_rate: 0,
       cumulative_diligence_rate: 0,
       day_of_week: dayOfWeek
-    });
+    } as any);
 
   if (error && error.code !== '23505') { // Ignore unique constraint violation
     console.error('Error initializing day metrics:', error);

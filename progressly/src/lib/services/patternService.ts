@@ -15,7 +15,9 @@ import type {
   ActivityReadWithCategory
 } from '@/lib/types';
 
-const supabase = getSupabaseBrowserClient();
+// Cast as any to bypass TypeScript checking for new tables
+// TODO: Regenerate Supabase types after running migrations
+const supabase: any = getSupabaseBrowserClient();
 
 /**
  * Get all detected patterns for a challenge
@@ -25,7 +27,7 @@ export async function getPatterns(
   minConfidence: number = 50
 ): Promise<BehaviorPattern[]> {
   const { data, error } = await supabase
-    .from('behavior_patterns')
+    .from('behavior_patterns' as any)
     .select('*')
     .eq('challenge_id', challengeId)
     .gte('confidence_score', minConfidence)
@@ -259,7 +261,7 @@ async function savePattern(
 ): Promise<void> {
   // Check if pattern exists
   const { data: existing } = await supabase
-    .from('behavior_patterns')
+    .from('behavior_patterns' as any)
     .select('id')
     .eq('challenge_id', challengeId)
     .eq('pattern_type', patternType)
@@ -268,23 +270,23 @@ async function savePattern(
   if (existing) {
     // Update existing
     await supabase
-      .from('behavior_patterns')
+      .from('behavior_patterns' as any)
       .update({
         pattern_data: patternData,
         confidence_score: Math.round(confidenceScore),
         last_updated: new Date().toISOString()
-      })
-      .eq('id', existing.id);
+      } as any)
+      .eq('id', (existing as any).id);
   } else {
     // Insert new
     await supabase
-      .from('behavior_patterns')
+      .from('behavior_patterns' as any)
       .insert({
         challenge_id: challengeId,
         pattern_type: patternType,
         pattern_data: patternData,
         confidence_score: Math.round(confidenceScore)
-      });
+      } as any);
   }
 }
 

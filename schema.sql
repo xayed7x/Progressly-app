@@ -131,6 +131,7 @@ CREATE TABLE public.user_sessions (
   user_id character varying NOT NULL UNIQUE,
   current_effective_date date NOT NULL,
   ended_at timestamp without time zone DEFAULT now(),
+  active_timer jsonb,
   CONSTRAINT user_sessions_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.users (

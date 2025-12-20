@@ -13,7 +13,9 @@ import type {
   ActivityReadWithCategory
 } from '@/lib/types';
 
-const supabase = getSupabaseBrowserClient();
+// Cast as any to bypass TypeScript checking for new tables
+// TODO: Regenerate Supabase types after running migrations
+const supabase: any = getSupabaseBrowserClient();
 
 /**
  * Get metrics for a specific day
@@ -23,7 +25,7 @@ export async function getDailyMetrics(
   date: string
 ): Promise<DailyChallengeMetrics | null> {
   const { data, error } = await supabase
-    .from('daily_challenge_metrics')
+    .from('daily_challenge_metrics' as any)
     .select('*')
     .eq('challenge_id', challengeId)
     .eq('date', date)
@@ -47,7 +49,7 @@ export async function getAllMetrics(
   challengeId: string
 ): Promise<DailyChallengeMetrics[]> {
   const { data, error } = await supabase
-    .from('daily_challenge_metrics')
+    .from('daily_challenge_metrics' as any)
     .select('*')
     .eq('challenge_id', challengeId)
     .order('date', { ascending: true });
@@ -69,7 +71,7 @@ export async function getMetricsRange(
   endDate: string
 ): Promise<DailyChallengeMetrics[]> {
   const { data, error } = await supabase
-    .from('daily_challenge_metrics')
+    .from('daily_challenge_metrics' as any)
     .select('*')
     .eq('challenge_id', challengeId)
     .gte('date', startDate)
@@ -221,8 +223,8 @@ export async function calculateDailyMetrics(
   };
 
   const { data, error } = await supabase
-    .from('daily_challenge_metrics')
-    .upsert(metricsData, { onConflict: 'challenge_id,date' })
+    .from('daily_challenge_metrics' as any)
+    .upsert(metricsData as any, { onConflict: 'challenge_id,date' })
     .select()
     .single();
 
@@ -247,8 +249,8 @@ export async function updateDailyContext(
   }
 ): Promise<DailyChallengeMetrics> {
   const { data, error } = await supabase
-    .from('daily_challenge_metrics')
-    .update(context)
+    .from('daily_challenge_metrics' as any)
+    .update(context as any)
     .eq('challenge_id', challengeId)
     .eq('date', date)
     .select()
