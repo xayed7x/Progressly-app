@@ -15,6 +15,14 @@ import {
 } from './_components/DailySummaryChart';
 import { DaySelector } from './_components/DaySelector';
 
+// Challenge system imports
+import { ChallengeSetup } from './_components/ChallengeSetup';
+import { ChallengeDashboard } from './_components/ChallengeDashboard';
+import { EndOfDaySummary } from './_components/EndOfDaySummary';
+import { DailyCoachInsight } from './_components/DailyCoachInsight';
+import { useChallenges } from '@/hooks/useChallenges';
+import type { CommitmentProgress } from '@/lib/types';
+
 import {
   Category,
   ActivityReadWithCategory,
@@ -54,6 +62,20 @@ export default function DashboardClientPage({
   const [optimisticActivities, setOptimisticActivities] = useState<
     ActivityReadWithCategory[]
   >([]);
+
+  // Challenge system state
+  const [showChallengeSetup, setShowChallengeSetup] = useState(false);
+  const [showEndOfDay, setShowEndOfDay] = useState(false);
+  const [commitmentProgress, setCommitmentProgress] = useState<Record<string, CommitmentProgress>>({});
+
+  // Challenge hook - provides active challenge and operations
+  const { 
+    activeChallenge, 
+    todayMetrics, 
+    currentDayNumber, 
+    createChallenge, 
+    refetch: refetchChallenge 
+  } = useChallenges(user?.id || null);
 
   useEffect(() => {
     const initializeUser = async () => {
@@ -197,16 +219,16 @@ export default function DashboardClientPage({
     if (!bootstrapData) return [];
 
     // Always calculate from the activities for the selected date
-    const categoryDurations: { [key: string]: PieChartData } = {};
+    const categoryDurations: { [key: string]: { name: string; color: string; duration: number } } = {};
 
     for (const activity of activitiesForSelectedDate) {
       if (activity.category) {
         const duration = calculateDuration(activity.start_time, activity.end_time);
-        if (categoryDurations[activity.category.id]) {
-          categoryDurations[activity.category.id].duration += duration;
+        const catId = String(activity.category.id);
+        if (categoryDurations[catId]) {
+          categoryDurations[catId].duration += duration;
         } else {
-          categoryDurations[activity.category.id] = {
-            id: parseInt(activity.category.id, 10),
+          categoryDurations[catId] = {
             name: activity.category.name,
             color: activity.category.color,
             duration: duration,
@@ -214,7 +236,14 @@ export default function DashboardClientPage({
         }
       }
     }
-    const data = Object.values(categoryDurations);
+    
+    // Convert to array with numeric ids (using index)
+    const data = Object.entries(categoryDurations).map(([catId, val], index) => ({
+      id: index + 1, // Use sequential numeric ID to avoid NaN
+      name: val.name,
+      color: val.color,
+      duration: val.duration,
+    }));
     
     // Sort data by duration in descending order
     return data.sort((a, b) => b.duration - a.duration);
@@ -368,46 +397,62 @@ export default function DashboardClientPage({
             Welcome back, {displayName.split(' ')[0]}!
           </h1>
 
-          {selectedDate ? (
-            <>
-              <ActivityLogger
-                categories={sortedCategories}
-                lastEndTime={bootstrapData?.last_end_time?.substring(0, 5) ?? undefined}
-                onActivityLogged={handleActivityLogged} // Use the new handler
-                addOptimisticActivity={addOptimisticActivity}
-                selectedDate={selectedDate} // Pass down selectedDate
+          {/* Challenge Section */}
+          {!activeChallenge ? (
+            <div className="w-full max-w-lg p-6 bg-gradient-to-r from-primary/10 to-blue-500/10 rounded-xl border border-primary/20 text-center">
+              <h2 className="text-xl font-semibold mb-2">Start Your Challenge</h2>
+              <p className="text-white/60 text-sm mb-4">
+                Transform your habits with a 100-day consistency challenge
+              </p>
+              <button
+                onClick={() => setShowChallengeSetup(true)}
+                className="px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:opacity-90 transition-opacity"
+              >
+                🎯 Create Challenge
+              </button>
+            </div>
+          ) : (
+            <div className="w-full max-w-lg space-y-4">
+              <DailyCoachInsight
+                challengeId={activeChallenge.id}
+                userId={user?.id || ''}
+                onOpenChat={() => window.location.href = '/chat'}
               />
-
-              <DaySelector
-                selectedDate={selectedDate}
+              <ChallengeDashboard
+                challenge={activeChallenge}
+                todayMetrics={todayMetrics}
+                currentDayNumber={currentDayNumber || 1}
+                activities={activitiesForSelectedDate}
+                categories={sortedCategories}
+                onOpenEndOfDay={() => setShowEndOfDay(true)}
+                onOpenCoach={() => window.location.href = '/chat'}
+                onActivityLogged={() => {
+                  refetchChallenge();
+                  mutateBootstrap();
+                }}
+                // Logger Props
+                lastEndTime={bootstrapData?.last_end_time?.substring(0, 5) ?? undefined}
+                addOptimisticActivity={addOptimisticActivity}
+                selectedDate={selectedDate || new Date()}
+                // List Props
+                optimisticActivities={optimisticActivities}
+                isLoadingActivities={isLoadingBootstrap}
+                onActivityUpdated={mutateBootstrap}
+                // Chart Props
+                pieChartData={pieChartDataForSelectedDate}
+                // Navigation Props
                 onPreviousClick={handleGoToPreviousDay}
                 onNextClick={handleGoToNextDay}
                 onEndDay={handleEndDay}
                 isPreviousDisabled={isPreviousDisabled}
                 isNextDisabled={isNextDisabled}
-                isDayEnded={endedDate === selectedDate.toISOString().split('T')[0]}
+                isDayEnded={endedDate === (selectedDate || new Date()).toISOString().split('T')[0]}
               />
+            </div>
+          )}
 
-              <div className="w-full max-w-lg bg-secondary/40 p-4 rounded-lg">
-                <ActivitiesWrapper
-                  activities={activitiesForSelectedDate}
-                  optimisticActivities={optimisticActivities}
-                  isLoading={isLoadingBootstrap}
-                  selectedDate={selectedDate}
-                  onActivityUpdated={mutateBootstrap}
-                />
-              </div>
-
-              <div className="mt-12 w-full max-w-2xl">
-                {isLoadingBootstrap ? (
-                  <ChartSkeleton />
-                ) : (
-                  <DailySummaryChart
-                    selectedDate={selectedDate}
-                    data={pieChartDataForSelectedDate}
-                  />
-                )}
-              </div>
+          {selectedDate ? (
+            <>
             </>
           ) : (
             <div className="text-center text-white/60">Loading your day...</div>
@@ -420,6 +465,34 @@ export default function DashboardClientPage({
           */}
         </div>
       </div>
+
+      {/* Challenge Setup Modal */}
+      <ChallengeSetup
+        isOpen={showChallengeSetup}
+        onClose={() => setShowChallengeSetup(false)}
+        onComplete={async (input) => {
+          await createChallenge(input);
+          setShowChallengeSetup(false);
+          refetchChallenge();
+        }}
+        categories={sortedCategories}
+      />
+
+      {/* End of Day Summary Modal */}
+      {activeChallenge && (
+        <EndOfDaySummary
+          isOpen={showEndOfDay}
+          onClose={() => setShowEndOfDay(false)}
+          challenge={activeChallenge}
+          activities={activitiesForSelectedDate}
+          commitmentProgress={commitmentProgress}
+          onComplete={() => {
+            setShowEndOfDay(false);
+            refetchChallenge();
+            mutateBootstrap();
+          }}
+        />
+      )}
     </main>
   );
 }

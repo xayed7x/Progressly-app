@@ -2,7 +2,7 @@
 from datetime import datetime, time, date
 from typing import Optional, List
 from sqlmodel import Field, SQLModel, Relationship
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import UniqueConstraint, Column, JSON
 
 # --- Goal Models (Existing and Unchanged) ---
 
@@ -132,11 +132,11 @@ class Message(SQLModel, table=True):
     conversation: Optional[Conversation] = Relationship(back_populates="messages")
 
 
-# --- User Session Model (for End My Day state) ---
+# --- User Session Model (for End My Day state + Active Timer) ---
 class UserSession(SQLModel, table=True):
     """
     Tracks the user's current psychological day session.
-    Used for cross-device sync of "End My Day" state.
+    Used for cross-device sync of "End My Day" state and active quick-tap timer.
     """
     __tablename__ = "user_sessions"
     
@@ -144,3 +144,51 @@ class UserSession(SQLModel, table=True):
     user_id: str = Field(unique=True, index=True)  # One session per user
     current_effective_date: date  # The user's current psychological day
     ended_at: datetime = Field(default_factory=datetime.utcnow)  # When they ended the day
+    # Active timer for QuickTap (cross-device sync)
+    # JSON: { "category_id": "...", "category_name": "...", "start_time": "ISO string" } or null
+    active_timer: Optional[dict] = Field(default=None, sa_column=Column(JSON))
+
+
+# --- Challenge Models ---
+class ChallengeBase(SQLModel):
+    name: str
+    start_date: date
+    end_date: date
+    duration_days: int
+    status: str = "active"
+    commitments: List[dict] = Field(default=[], sa_column=Column(JSON))
+    identity_statement: Optional[str] = None
+    why_statement: Optional[str] = None
+    obstacle_prediction: Optional[str] = None
+    success_threshold: float = 70.0
+
+class Challenge(ChallengeBase, table=True):
+    __tablename__ = "challenges"
+    id: Optional[UUID] = Field(default_factory=uuid4, primary_key=True)
+    user_id: str = Field(index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+class ChallengeCreate(ChallengeBase):
+    pass
+
+
+class DailyChallengeMetricsBase(SQLModel):
+    challenge_id: UUID = Field(foreign_key="challenges.id")
+    date: date
+    day_number: int
+    commitments_status: dict = Field(default={}, sa_column=Column(JSON))
+    overall_completion_pct: float = 0.0
+    consistency_score: float = 0.0
+    diligence_score: float = 0.0
+    # Context
+    notes: Optional[str] = None
+    mood: Optional[str] = None
+    energy_level: Optional[int] = None
+
+class DailyChallengeMetrics(DailyChallengeMetricsBase, table=True):
+    __tablename__ = "daily_challenge_metrics"
+    id: Optional[UUID] = Field(default_factory=uuid4, primary_key=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+

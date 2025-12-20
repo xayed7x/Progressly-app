@@ -17,10 +17,13 @@ from database import engine, get_session
 from models import Goal, GoalCreate, LoggedActivity, ActivityCreate, ActivityUpdate, Category, ActivityReadWithCategory, DailyTarget, CategoryCreate
 
 # Import our routers
-from routers import summary, jobs, ai as ai_router, targets as targets_router, categories as categories_router
+from routers import summary, jobs, ai as ai_router, targets as targets_router, categories as categories_router, challenges as challenges_router
 
 # Import the shared dependencies used in this file
 from dependencies import get_current_user, get_db_session
+
+# Import Services
+from services.challenge_tracker import update_challenge_progress
 
 DBSession = Annotated[Session, Depends(get_db_session)]
 
@@ -66,6 +69,7 @@ app.include_router(summary.router)
 app.include_router(jobs.router)
 app.include_router(ai_router.router, prefix="/api", tags=["ai"])
 app.include_router(targets_router.router, prefix="/api/targets", tags=["targets"])
+app.include_router(challenges_router.router, tags=["challenges"])
 
 # === Root & Goal Endpoints (No change) ===
 @app.get("/")
@@ -286,6 +290,118 @@ def end_my_day(
         print(f"ERROR in end_my_day: {type(e).__name__}: {e}")
         raise HTTPException(status_code=500, detail="Failed to end day.")
 
+# === Active Timer Endpoints (for cross-device sync) ===
+class ActiveTimerData(SQLModel):
+    category_id: str
+    category_name: str
+    start_time: str  # ISO format datetime string
+
+class ActiveTimerResponse(SQLModel):
+    active_timer: Optional[ActiveTimerData] = None
+
+class SetActiveTimerRequest(SQLModel):
+    category_id: str
+    category_name: str
+    start_time: str
+
+@app.get("/api/timer/active", response_model=ActiveTimerResponse)
+def get_active_timer(
+    db: DBSession,
+    user_id: str = Depends(get_current_user)
+):
+    """
+    Get the user's currently active quick-tap timer.
+    Used for cross-device sync of running timers.
+    """
+    from models import UserSession
+    
+    try:
+        session = db.exec(
+            select(UserSession).where(UserSession.user_id == user_id)
+        ).first()
+        
+        if session and session.active_timer:
+            return ActiveTimerResponse(
+                active_timer=ActiveTimerData(**session.active_timer)
+            )
+        
+        return ActiveTimerResponse(active_timer=None)
+    except Exception as e:
+        print(f"ERROR in get_active_timer: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get active timer.")
+
+@app.post("/api/timer/active", response_model=ActiveTimerResponse)
+def set_active_timer(
+    request: Optional[SetActiveTimerRequest],
+    db: DBSession,
+    user_id: str = Depends(get_current_user)
+):
+    """
+    Set or clear the user's active quick-tap timer.
+    Pass null body to clear the timer.
+    """
+    from models import UserSession
+    
+    try:
+        session = db.exec(
+            select(UserSession).where(UserSession.user_id == user_id)
+        ).first()
+        
+        timer_data = None
+        if request:
+            timer_data = {
+                "category_id": request.category_id,
+                "category_name": request.category_name,
+                "start_time": request.start_time
+            }
+        
+        if session:
+            session.active_timer = timer_data
+        else:
+            # Create new session with timer
+            session = UserSession(
+                user_id=user_id,
+                current_effective_date=date.today(),
+                active_timer=timer_data
+            )
+            db.add(session)
+        
+        db.commit()
+        db.refresh(session)
+        
+        if session.active_timer:
+            return ActiveTimerResponse(
+                active_timer=ActiveTimerData(**session.active_timer)
+            )
+        return ActiveTimerResponse(active_timer=None)
+    except Exception as e:
+        print(f"ERROR in set_active_timer: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to set active timer.")
+
+@app.delete("/api/timer/active")
+def clear_active_timer(
+    db: DBSession,
+    user_id: str = Depends(get_current_user)
+):
+    """
+    Clear the user's active quick-tap timer.
+    """
+    from models import UserSession
+    
+    try:
+        session = db.exec(
+            select(UserSession).where(UserSession.user_id == user_id)
+        ).first()
+        
+        if session:
+            session.active_timer = None
+            db.commit()
+        
+        return {"success": True}
+    except Exception as e:
+        print(f"ERROR in clear_active_timer: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to clear timer.")
+
 # === Categories Endpoints ===
 @app.get("/api/categories/", response_model=list[Category])
 @app.get("/api/categories", response_model=list[Category])
@@ -347,6 +463,14 @@ def create_activity(activity_data: ActivityCreate, db: DBSession, user_id: str =
     
     # Return with category data
     category = db.get(Category, new_activity.category_id) if new_activity.category_id else None
+    
+    # --- Update Challenge Progress ---
+    try:
+        cat_name = category.name if category else None
+        update_challenge_progress(db, user_id, new_activity, cat_name)
+    except Exception as e:
+        print(f"WARNING: Challenge progress update failed: {e}")
+    # ---------------------------------
     
     return ActivityReadWithCategory(
         id=new_activity.id,

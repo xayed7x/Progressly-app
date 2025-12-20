@@ -2802,3 +2802,303 @@ function TrendsTab({ metrics }) {
             <Tooltip />
             <Line type="monotone" dataKey="completion" stroke="#3B82F6" strokeWidth={2} dot={false} name="Daily" />
             <Line type="
+
+
+            # Progressly App - Final Sections (Conceptual Overview)
+
+## 14. Section 10: Analytics & Insights Dashboard (Continued)
+
+### Trends Tab
+Shows line charts of your performance over time:
+- **Daily completion percentage** as a line graph (day 1 to current day)
+- **7-day rolling average** line overlaid to smooth out daily fluctuations and show true trajectory
+- **Consistency vs Diligence** separate lines to see which is stronger/weaker
+- Ability to zoom into specific date ranges (last 7 days, last 30 days, all time)
+
+### Patterns Tab
+Displays all detected patterns in cards:
+- Shows pattern type (weak day, strong time, recovery speed)
+- Confidence score for each pattern
+- Actionable recommendations based on the pattern
+- Option to "dismiss" patterns if user disagrees
+- Visual indicators (icons, colors) for pattern severity
+
+### Comparison Tab
+Compare your performance to goals and benchmarks:
+- **Target vs Actual**: Bar chart showing committed hours vs actual hours for each commitment
+- **Days ahead/behind pace**: Shows if you're on track to meet 100-day goals
+- **Week-over-week comparison**: Did you improve this week vs last week?
+- **Best vs Worst week**: Highlight your peak performance week and your struggling week
+- Optional: Anonymous comparison with other users' average (if SaaS)
+
+### Export Functionality
+- Generate PDF report with all charts and statistics
+- CSV export of raw daily metrics
+- Shareable image cards for social media (your choice if private)
+
+---
+
+## 15. Section 11: Notification System
+
+### Purpose
+Proactive reminders and encouragement to maintain consistency without being annoying.
+
+### Notification Types
+
+**1. Morning Motivation (Daily)**
+- Trigger: User-defined time (e.g., 6:00 AM)
+- Message: "Good morning! Day X/100. Your consistency is Y%. Let's make today count!"
+- Action: Opens app to Challenge Dashboard
+- Can be snoozed or disabled
+
+**2. Activity Start Reminders (Pattern-based)**
+- Trigger: Based on user's typical activity times detected from patterns
+- Example: If user typically studies at 9:00 AM, notify at 8:55 AM
+- Message: "Time to start studying? You usually begin around now."
+- Action: Opens Quick Tap cards
+- Only shown if pattern confidence > 70%
+
+**3. End-of-Day Review (Nightly)**
+- Trigger: User-defined time (default 9:00 PM)
+- Message: "Let's review your day! You have X hours logged so far."
+- Action: Opens End-of-Day Summary modal
+- Includes quick stats in notification: "Study: 8/10 hours, Running: ✓"
+
+**4. Missed Day Alert (Next Morning)**
+- Trigger: If previous day had 0% completion, notify next morning
+- Message: "Yesterday was tough. Today is a fresh start. What's one small thing you can do right now?"
+- Tone: Encouraging, not shaming (AVE prevention)
+- Action: Opens Quick Log or AI Coach
+
+**5. Milestone Celebrations**
+- Trigger: Day 21, 50, 66, 75, 100
+- Message: "🎉 Day 50! You're halfway there! Your consistency is 87% - you're crushing it!"
+- Action: Shows celebration screen with confetti animation
+- Suggests sharing achievement
+
+**6. Streak Protection (Context-aware)**
+- Trigger: Evening of a day where no activity logged yet AND user has active streak
+- Message: "🔥 Your 12-day streak is at risk! Even 30 minutes counts."
+- Action: Opens Quick Tap with emphasis on fastest commitment to complete
+- Only shown if current streak > 7 days
+
+**7. Pattern-based Warnings (Predictive)**
+- Trigger: On days user typically struggles (e.g., Friday morning if Friday is weak day)
+- Message: "Heads up: Fridays are tough for you (65% avg). What's your strategy today?"
+- Action: Opens AI Coach for planning conversation
+- Only shown if pattern confidence > 60%
+
+**8. Recovery Encouragement (Post-miss)**
+- Trigger: Day after a missed day, when user logs first activity
+- Message: "Welcome back! You're building resilience. Recovery matters more than perfection."
+- Action: Shows resilience score increase
+- One-time per recovery event
+
+### Notification Preferences
+Users can configure:
+- Which notification types to receive
+- Time preferences for each type
+- Quiet hours (no notifications during sleep)
+- Notification frequency (default, moderate, minimal)
+- Sound/vibration settings
+
+### Implementation Approach
+- Use Web Push Notifications API for browser notifications
+- Store user preferences in database (user_notification_preferences table)
+- Background service worker to schedule notifications
+- Respect browser permission status
+- Fallback to in-app banners if push notifications denied
+
+---
+
+## 16. Integration Points
+
+### Purpose
+Document how all features connect and work together as a cohesive system.
+
+### Data Flow Between Features
+
+**User logs activity (any method) →**
+1. Activity saved to `activities` table
+2. If activity matches a challenge commitment category → link to `challenge_id` and `commitment_id`
+3. Trigger recalculation of today's `daily_challenge_metrics`
+4. Update consistency score, diligence score, overall completion percentage
+5. Update cumulative metrics (consistency rate, diligence rate through entire challenge)
+6. Check if resilience score should increase (if today is a recovery day)
+7. Dashboard components listening to changes re-render with new data
+8. Heatmap calendar updates today's cell color
+9. Dual-ring progress indicators recalculate percentages
+10. AI coach context is updated for next conversation
+
+**Every 7 days (or on-demand) →**
+1. Pattern detection engine runs all detection functions
+2. New patterns saved to `behavior_patterns` table
+3. Pattern insights component refreshes to show new patterns
+4. AI coach system prompt includes updated patterns in context
+5. Notifications system uses patterns to schedule predictive reminders
+
+**User completes challenge (Day 100) →**
+1. Challenge status changed to 'completed'
+2. Final pattern detection runs
+3. Generate completion certificate/report
+4. Calculate final statistics (overall consistency, diligence, resilience score)
+5. Celebration screen shown
+6. Option to share achievement
+7. Option to start new challenge
+8. Archive challenge data for historical reference
+
+### Critical Integration Points
+
+**Quick Tap ↔ Challenge Dashboard**
+- When Quick Tap logs activity, Challenge Dashboard instantly updates commitment progress
+- Real-time progress bars show live updates
+- Both components subscribe to same Supabase real-time channel
+
+**Voice Logging ↔ Activity Database ↔ Metrics**
+- Voice input parsed by AI → Activities created → Metrics recalculated → All visualizations update
+- Single source of truth: activities table
+- All other data is derived/computed from activities
+
+**AI Coach ↔ Everything**
+- AI has read access to: challenge goals, activities, metrics, patterns, notes, mood
+- Context builder function aggregates all data before each AI conversation
+- AI responses can suggest actions that trigger other features (e.g., "Let's log that activity now" opens Quick Tap)
+
+**Pattern Detection ↔ Notifications ↔ AI Coach**
+- Patterns detected → Stored in database
+- Notifications read patterns to send predictive reminders
+- AI coach reads patterns to give personalized advice
+- Creates feedback loop: behavior → pattern → reminder → improved behavior
+
+**End-of-Day Summary ↔ All Logging Methods**
+- Reads all activities logged today (regardless of method used)
+- Detects gaps in timeline
+- Allows filling gaps with Quick Fill
+- Final save triggers metric calculation
+- Results shown in morning notification next day
+
+### API Integration Points
+
+**Supabase:**
+- Authentication: Google OAuth
+- Database: All tables (challenges, activities, metrics, patterns, presets)
+- Real-time: Subscribe to activity inserts/updates
+- Storage: (Future) User avatars, achievement certificates
+
+**Anthropic Claude API:**
+- Voice input parsing (natural language → structured data)
+- AI coach conversations (context-aware coaching)
+- Daily insight generation (automated motivation)
+- Pattern explanation (human-readable pattern descriptions)
+
+**Web APIs:**
+- Web Speech API: Voice recognition for voice logging
+- Notification API: Browser push notifications
+- Service Workers: Background notifications, offline capability
+
+### State Synchronization Strategy
+
+**Real-time updates:**
+- Activities table changes → Trigger Supabase real-time event → All connected components re-fetch
+- Use optimistic updates for immediate UI feedback
+
+**Calculated fields:**
+- Metrics calculated server-side (PostgreSQL functions) or client-side (JavaScript utils)
+- Cache calculations for performance (e.g., don't recalculate all 100 days on every activity)
+- Invalidate cache when underlying data changes
+
+**Cross-device sync:**
+- User logs activity on phone → Supabase updates → Desktop browser auto-refreshes
+- Challenge state consistent across all devices
+
+### Error Handling & Edge Cases
+
+**If user forgets to stop Quick Tap timer:**
+- Auto-stop after 8 hours with warning notification
+- Or auto-stop when new activity started
+- Allow manual correction in activity history
+
+**If voice input fails to parse:**
+- Show transcript to user
+- Allow manual correction
+- Fall back to manual logging
+
+**If AI coach API fails:**
+- Show cached response or fallback message
+- Don't block user from other features
+- Retry in background
+
+**If pattern detection finds no patterns:**
+- Show "Not enough data yet" message
+- Explain minimum data requirements (e.g., need 14 days for weekly patterns)
+- Encourage consistent logging
+
+**If user changes challenge commitments mid-challenge:**
+- Recalculate all future metrics with new commitments
+- Past metrics remain unchanged (historical accuracy)
+- Show notice: "Commitment changed on Day X"
+
+**If user misses multiple days:**
+- Don't punish with shame
+- AI coach provides recovery strategy
+- Resilience score increases more for recovering from longer gaps
+- Notifications become more encouraging (not nagging)
+
+### Performance Considerations
+
+**Database queries:**
+- Index on user_id, challenge_id, date for fast filtering
+- Pagination for long activity lists
+- Aggregate calculations in database (not client-side)
+
+**Real-time subscriptions:**
+- Only subscribe to current challenge's data
+- Unsubscribe when navigating away
+- Throttle updates if too frequent
+
+**Chart rendering:**
+- Use lazy loading for analytics page
+- Render charts only when tab is visible
+- Downsample data points if > 100 days (for performance)
+
+**AI API calls:**
+- Debounce user input to avoid excessive calls
+- Cache AI responses for identical queries
+- Stream responses for better UX
+- Set reasonable token limits
+
+### Future Expansion Points
+
+**What's built for:**
+- Multiple simultaneous challenges (free tier: 1, premium: unlimited)
+- Team challenges (compete with friends)
+- Public leaderboards (opt-in)
+- Custom challenge templates (share with community)
+- Mobile app (React Native, reuse most logic)
+
+**Modular design:**
+- Each feature is independent component
+- Can enable/disable features without breaking others
+- Easy to A/B test different variations
+- Easy to add new commitment types (e.g., sleep tracking, meditation)
+
+---
+
+## Summary: How It All Works Together
+
+**Day 1-7 (Getting Started):**
+User sets up challenge → Logs activities via Quick Tap or Voice → Dashboard shows progress → End-of-day reviews → AI provides basic encouragement
+
+**Day 8-30 (Pattern Building):**
+System detects patterns → AI coach becomes more personalized → Notifications become predictive → User sees insights dashboard → Adjusts behavior based on patterns
+
+**Day 31-66 (Habit Formation):**
+Consistency improves → Resilience score grows → User understands their own patterns → AI provides advanced strategies → Occasional setbacks handled with resilience
+
+**Day 67-100 (Mastery):**
+Habits feel automatic → Focus shifts to optimization → AI suggests efficiency improvements → Celebration of milestones → Preparation for challenge completion
+
+**Post-100 (Reflection & Iteration):**
+Final analytics report → Achievement unlocked → Option to start new challenge with refined commitments → Historical data preserved for comparison → Growth visible in concrete metrics
+
+The app evolves with the user, becoming more intelligent and personalized over time while always maintaining psychological safety through AVE prevention and resilience-focused design.
