@@ -7,6 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Typography } from '@/components/ui/typography';
 import { MessageCircle, Sparkles, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -68,15 +69,15 @@ export function DailyCoachInsight({ challengeId, userId, onOpenChat }: DailyCoac
   }
 
   return (
-    <Card className="bg-gradient-to-r from-white/5 to-white/10 border-white/10 text-white">
+    <Card variant="elevated" padding="md">
       <CardContent className="py-4">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-full bg-accent1/20 flex items-center justify-center flex-shrink-0">
             <Sparkles className="w-5 h-5 text-accent1" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium mb-1">Coach Insight</p>
-            <p className="text-sm text-gray-300">{insight}</p>
+            <Typography variant="body-sm" weight="medium" className="mb-1">Coach Insight</Typography>
+            <Typography variant="body-sm" color="secondary">{insight}</Typography>
             <div className="flex items-center gap-2 mt-3">
               <Button
                 variant="ghost"

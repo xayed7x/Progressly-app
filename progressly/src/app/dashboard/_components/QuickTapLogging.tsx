@@ -14,6 +14,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { format } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Typography } from '@/components/ui/typography';
 import { Button } from '@/components/ui/button';
 import { Play, Square, RefreshCw, AlertTriangle } from 'lucide-react';
 import type { Category, ActivityReadWithCategory } from '@/lib/types';
@@ -454,7 +455,7 @@ export function QuickTapLogging({
   }
 
   return (
-    <Card className="bg-white/5 border-white/10">
+    <Card variant="default" padding="md">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-medium flex items-center justify-between text-white">
           <span className="flex items-center gap-2">
@@ -473,12 +474,12 @@ export function QuickTapLogging({
         {runningActivity && (
           <div className="mb-4 p-3 bg-accent1/20 rounded-lg flex items-center justify-between border border-accent1/30">
             <div>
-              <p className="text-sm font-medium text-white">
+              <Typography variant="body-sm" weight="medium">
                 {runningActivity.categoryName}
-              </p>
-              <p className="text-xs text-white/60">
+              </Typography>
+              <Typography variant="caption" color="muted">
                 Started at {new Date(runningActivity.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </p>
+              </Typography>
             </div>
             <Button 
               variant="destructive" 
@@ -523,9 +524,9 @@ export function QuickTapLogging({
           })}
         </div>
 
-        <p className="text-xs text-white/40 text-center mt-3">
+        <Typography variant="caption" color="muted" className="text-center mt-3 block">
           Tap to start • Synced across devices
-        </p>
+        </Typography>
       </CardContent>
 
       {/* Gap Warning Dialog */}

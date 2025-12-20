@@ -29,6 +29,7 @@ import {
   DashboardBootstrapData,
   PieChartData,
 } from '@/lib/types';
+import { Typography } from '@/components/ui/typography';
 import { defaultActivityCategories } from '@/lib/constants';
 
 const API_BASE_URL =
@@ -393,20 +394,20 @@ export default function DashboardClientPage({
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/20 rounded-full blur-[100px]" />
       </div>
 
-      <div className="container mx-auto px-4 py-8 relative z-10">
+      <div className="container mx-auto px-4 py-4 relative z-10">
         <div className="flex flex-col items-center justify-center gap-y-8">
-          {/* Welcome Message */}
-          <h1 className="text-4xl font-bold text-center bg-gradient-to-r from-accent to-blue-500 bg-clip-text text-transparent">
+          {/* Welcome Message - Subtle greeting with gradient */}
+          <Typography variant="h3" className="text-center bg-gradient-to-r from-accent to-blue-500 bg-clip-text text-transparent">
             Welcome back, {displayName.split(' ')[0]}!
-          </h1>
+          </Typography>
 
           {/* Challenge Section */}
           {!activeChallenge ? (
             <div className="w-full max-w-lg p-6 bg-gradient-to-r from-primary/10 to-blue-500/10 rounded-xl border border-primary/20 text-center">
-              <h2 className="text-xl font-semibold mb-2">Start Your Challenge</h2>
-              <p className="text-white/60 text-sm mb-4">
+              <Typography variant="h2" className="mb-2">Start Your Challenge</Typography>
+              <Typography variant="body-sm" color="muted" className="mb-4">
                 Transform your habits with a 100-day consistency challenge
-              </p>
+              </Typography>
               <button
                 onClick={() => setShowChallengeSetup(true)}
                 className="px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:opacity-90 transition-opacity"

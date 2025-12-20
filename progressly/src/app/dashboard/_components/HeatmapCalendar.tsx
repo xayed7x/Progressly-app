@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Typography } from '@/components/ui/typography';
 import type { DailyChallengeMetrics } from '@/lib/types';
 import * as metricsService from '@/lib/services/metricsService';
 
@@ -168,15 +169,15 @@ export function HeatmapCalendar({ challengeId, startDate, endDate, currentDay }:
         </div>
         
         {/* Color legend */}
-        <div className="flex items-center gap-1 mt-3 text-xs text-muted-foreground">
-          <span>Less</span>
+        <div className="flex items-center gap-1 mt-3">
+          <Typography variant="caption" color="muted">Less</Typography>
           <div className="w-3 h-3 rounded-sm bg-gray-300 dark:bg-gray-700" />
           <div className="w-3 h-3 rounded-sm bg-orange-200 dark:bg-orange-900" />
           <div className="w-3 h-3 rounded-sm bg-yellow-200 dark:bg-yellow-800" />
           <div className="w-3 h-3 rounded-sm bg-green-200 dark:bg-green-800" />
           <div className="w-3 h-3 rounded-sm bg-green-400 dark:bg-green-600" />
           <div className="w-3 h-3 rounded-sm bg-green-600 dark:bg-green-500" />
-          <span>More</span>
+          <Typography variant="caption" color="muted">More</Typography>
         </div>
       </div>
     </TooltipProvider>

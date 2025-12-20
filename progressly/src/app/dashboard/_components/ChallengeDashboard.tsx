@@ -6,7 +6,9 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { AnimatePresence, motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Typography, BoldNumber } from '@/components/ui/typography';
 import { Button } from '@/components/ui/button';
 import { 
   Target, 
@@ -160,81 +162,36 @@ export function ChallengeDashboard({
   return (
     <div className="space-y-6">
       {/* Challenge Header */}
-      <Card className="bg-gradient-to-r from-white/5 to-white/10 border-white/10 text-white">
-        <CardContent className="py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-bold font-serif">{challenge.name}</h2>
-              <p className="text-gray-400">
-                Day {currentDayNumber} of {challenge.duration_days}
-              </p>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="text-center">
-                <p className="text-2xl font-bold text-accent1">{overallProgress}%</p>
-                <p className="text-xs text-gray-400">Today</p>
-              </div>
-              {currentStreak > 0 && (
-                <div className="text-center px-3 py-1 bg-orange-500/10 rounded-lg border border-orange-500/20">
-                  <p className="text-lg font-bold text-orange-400">🔥 {currentStreak}</p>
-                  <p className="text-xs text-gray-400">Streak</p>
-                </div>
-              )}
-            </div>
+      {/* Challenge Header - Hero Section */}
+      <Card variant="elevated" padding="lg">
+        <div className="flex items-center justify-between">
+          <div>
+            <Typography variant="h2" className="font-serif">{challenge.name}</Typography>
+            <Typography variant="body-sm" color="muted">
+              Day {currentDayNumber} of {challenge.duration_days}
+            </Typography>
           </div>
-        </CardContent>
+          <div className="flex items-center gap-4">
+            <div className="text-center">
+              <Typography variant="display" className="text-accent1">{overallProgress}%</Typography>
+              <Typography variant="caption" color="muted">Today</Typography>
+            </div>
+            {currentStreak > 0 && (
+              <div className="text-center px-3 py-1 bg-orange-500/10 rounded-lg border border-orange-500/20">
+                <Typography variant="h3" className="text-orange-400">🔥 {currentStreak}</Typography>
+                <Typography variant="caption" color="muted">Streak</Typography>
+              </div>
+            )}
+          </div>
+        </div>
       </Card>
 
-      {/* Log Center (Tabs) */}
-      <Tabs value={activeLogTab} onValueChange={setActiveLogTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-4 bg-white/5 border border-white/10 p-1 rounded-lg">
-          <TabsTrigger 
-            value="quick"
-            className="data-[state=active]:bg-accent1 data-[state=active]:text-primary"
-          >
-            ⚡ Quick Log
-          </TabsTrigger>
-          <TabsTrigger 
-            value="manual"
-            className="data-[state=active]:bg-accent1 data-[state=active]:text-primary"
-          >
-            📝 Manual Entry
-          </TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="quick" className="mt-0">
-          <QuickTapLogging
-            categories={categories}
-            onActivityLogged={onActivityLogged}
-            addOptimisticActivity={addOptimisticActivity}
-            selectedDate={selectedDate}
-            lastEndTime={lastEndTime}
-            onSwitchToManual={() => setActiveLogTab("manual")}
-          />
-        </TabsContent>
-        <TabsContent value="manual" className="mt-0">
-           <div className="bg-transparent"> 
-             {/* Wrap ActivityLogger to control its card width/style if needed 
-                 ActivityLogger has its own Card, so we might want to strip it or use it as is.
-                 It has w-full max-w-lg.
-             */}
-             <ActivityLogger
-                categories={categories}
-                lastEndTime={lastEndTime}
-                onActivityLogged={onActivityLogged}
-                addOptimisticActivity={addOptimisticActivity}
-                selectedDate={selectedDate}
-             />
-           </div>
-        </TabsContent>
-      </Tabs>
-
-      {/* Today's Commitments */}
+      {/* Today's Commitments - MOVED BEFORE Log Center per design-inspiration.md */}
       <div className="space-y-3">
-        <h3 className="text-lg font-semibold flex items-center gap-2">
+        <Typography variant="h3" as="h3" className="flex items-center gap-2">
           <Target className="w-5 h-5" />
           Today's Commitments
-        </h3>
+        </Typography>
         
         <div className="grid gap-3">
           {challenge.commitments.map((commitment) => {
@@ -244,10 +201,12 @@ export function ChallengeDashboard({
             return (
               <Card 
                 key={commitment.id}
+                variant={isComplete ? "default" : "default"}
+                hoverable
                 className={`transition-all ${
                   isComplete 
                     ? 'bg-green-500/10 border-green-500/20' 
-                    : 'bg-white/5 border-white/10 hover:bg-white/10'
+                    : ''
                 }`}
               >
                 <CardContent className="py-4">
@@ -255,34 +214,34 @@ export function ChallengeDashboard({
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         {isComplete ? (
-                          <CheckCircle2 className="w-5 h-5 text-green-600" />
+                          <CheckCircle2 className="w-5 h-5 text-green-500" />
                         ) : (
-                          <Clock className="w-5 h-5 text-muted-foreground" />
+                          <Clock className="w-5 h-5 text-white/40" />
                         )}
-                        <span className="font-medium">{commitment.habit}</span>
-                        <span className="text-xs px-2 py-0.5 bg-muted rounded">
+                        <Typography variant="body" weight="medium">{commitment.habit}</Typography>
+                        <span className="text-xs px-2 py-0.5 bg-white/10 rounded text-white/70">
                           {commitment.category}
                         </span>
                       </div>
                       
                       {/* Progress bar */}
                       <div className="mt-2">
-                        <div className="flex items-center justify-between text-sm mb-1">
-                          <span className="text-muted-foreground">
+                        <div className="flex items-center justify-between mb-1">
+                          <Typography variant="body-sm" color="muted">
                             {commitment.target === 'complete' 
                               ? (isComplete ? 'Completed' : 'Not started')
                               : `${progress?.actual || 0} / ${commitment.target} ${commitment.unit}`
                             }
-                          </span>
-                          <span className={isComplete ? 'text-green-600 font-medium' : ''}>
+                          </Typography>
+                          <Typography variant="body-sm" weight="bold" className={isComplete ? 'text-green-500' : 'text-accent1'}>
                             {progress?.percentage || 0}%
-                          </span>
+                          </Typography>
                         </div>
-                        <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                        <div className="h-3 bg-white/10 rounded-full overflow-hidden">
                           <div 
                             className={`h-full rounded-full transition-all duration-500 ${
                               isComplete ? 'bg-green-500' : 
-                              (progress?.percentage || 0) > 50 ? 'bg-yellow-500' : 'bg-primary dark:bg-accent1'
+                              (progress?.percentage || 0) > 50 ? 'bg-yellow-500' : 'bg-accent1'
                             }`}
                             style={{ width: `${progress?.percentage || 0}%` }}
                           />
@@ -291,7 +250,7 @@ export function ChallengeDashboard({
                     </div>
                     
                     {!isComplete && (
-                      <Button variant="ghost" size="icon" className="ml-4">
+                      <Button variant="ghost" size="icon" className="ml-4 text-white/60 hover:text-white hover:bg-white/10">
                         <Play className="w-4 h-4" />
                       </Button>
                     )}
@@ -300,6 +259,76 @@ export function ChallengeDashboard({
               </Card>
             );
           })}
+        </div>
+      </div>
+
+      {/* Log Center (Animated Tabs) */}
+      <div className="w-full">
+        <div className="grid w-full grid-cols-2 mb-4 bg-white/5 border border-white/10 p-1 rounded-lg relative">
+          {/* Animated Background */}
+          <div className="absolute inset-1 flex pointer-events-none">
+            <div className={`w-1/2 h-full transition-transform duration-300 ease-out ${activeLogTab === 'manual' ? 'translate-x-full' : 'translate-x-0'}`}>
+              <div className="w-full h-full bg-accent1 rounded-md shadow-sm" />
+            </div>
+          </div>
+
+          <button 
+            onClick={() => setActiveLogTab('quick')}
+            className={`relative z-10 py-1.5 text-sm font-medium transition-colors duration-200 ${
+              activeLogTab === 'quick' ? 'text-primary' : 'text-muted-foreground hover:text-white'
+            }`}
+          >
+            ⚡ Quick Log
+          </button>
+          <button 
+            onClick={() => setActiveLogTab('manual')}
+            className={`relative z-10 py-1.5 text-sm font-medium transition-colors duration-200 ${
+              activeLogTab === 'manual' ? 'text-primary' : 'text-muted-foreground hover:text-white'
+            }`}
+          >
+            📝 Manual Entry
+          </button>
+        </div>
+        
+        <div className="relative overflow-hidden min-h-[400px]">
+          <AnimatePresence mode="wait">
+            {activeLogTab === 'quick' ? (
+              <motion.div
+                key="quick"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.2 }}
+              >
+                <QuickTapLogging
+                  categories={categories}
+                  onActivityLogged={onActivityLogged}
+                  addOptimisticActivity={addOptimisticActivity}
+                  selectedDate={selectedDate}
+                  lastEndTime={lastEndTime}
+                  onSwitchToManual={() => setActiveLogTab("manual")}
+                />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="manual"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                transition={{ duration: 0.2 }}
+              >
+                 <div className="bg-transparent"> 
+                   <ActivityLogger
+                      categories={categories}
+                      lastEndTime={lastEndTime}
+                      onActivityLogged={onActivityLogged}
+                      addOptimisticActivity={addOptimisticActivity}
+                      selectedDate={selectedDate}
+                   />
+                 </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 

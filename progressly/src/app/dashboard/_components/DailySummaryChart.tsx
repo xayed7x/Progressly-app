@@ -17,7 +17,6 @@ import { PieChartData } from '@/lib/types';
 import { defaultCategoryHexColors } from '@/lib/constants';
 import { CATEGORY_CONFIG } from '@/lib/category-config';
 
-// Shadcn UI components
 import {
   Card,
   CardContent,
@@ -25,6 +24,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { Typography } from '@/components/ui/typography';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -156,9 +156,9 @@ export function DailySummaryChart({ selectedDate, data }: DailySummaryChartProps
       <CardContent>
         {data.length === 0 ? (
           <div className="flex items-center justify-center h-[350px]">
-            <p className="text-muted-foreground">
+            <Typography variant="body" color="muted">
               No activities logged for this day.
-            </p>
+            </Typography>
           </div>
         ) : (
           <Tabs

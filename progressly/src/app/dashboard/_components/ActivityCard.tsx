@@ -1,6 +1,7 @@
 import { ActivityReadWithCategory } from "@/lib/types";
 import { format, parse } from "date-fns";
 import { Button } from "@/components/ui/button";
+import { Typography } from "@/components/ui/typography";
 import { Pencil, CloudOff, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { EditActivityDialog } from "./EditActivityDialog";
@@ -78,14 +79,14 @@ export default function ActivityCard({
           <div className="flex flex-col gap-3">
             {/* Tier 1: Main Info (Name and Time) */}
             <div className="flex flex-col">
-              <span className="font-semibold truncate text-base">
+              <Typography variant="body" weight="semibold" className="truncate text-black">
                 {activity.activity_name}
-              </span>
+              </Typography>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-primary/70">
+                <Typography variant="body-sm" className="text-black/70">
                   {formatTime(activity.start_time)} -{" "}
                   {formatTime(activity.end_time)}
-                </span>
+                </Typography>
                 {isPendingSync && (
                   <div title="Pending sync">
                     <CloudOff className="h-4 w-4 text-orange-400" />

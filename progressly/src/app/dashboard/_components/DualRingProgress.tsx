@@ -5,6 +5,8 @@
 
 'use client';
 
+import { Typography } from '@/components/ui/typography';
+
 interface DualRingProgressProps {
   consistencyRate: number;  // 0-100
   diligenceRate: number;    // 0-100
@@ -90,7 +92,7 @@ export function DualRingProgress({
           y={center}
           textAnchor="middle"
           dominantBaseline="middle"
-          className="text-2xl font-bold fill-foreground transform rotate-90"
+          className="text-3xl font-bold fill-accent1 transform rotate-90"
           style={{ transformOrigin: `${center}px ${center}px` }}
         >
           {average}%
@@ -98,14 +100,14 @@ export function DualRingProgress({
       </svg>
       
       {/* Legend */}
-      <div className="flex gap-4 text-xs">
+      <div className="flex gap-4">
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 rounded-full bg-blue-500" />
-          <span className="text-muted-foreground">Consistency: {consistencyRate}%</span>
+          <Typography variant="caption" color="muted">Consistency: {consistencyRate}%</Typography>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 rounded-full bg-green-500" />
-          <span className="text-muted-foreground">Diligence: {diligenceRate}%</span>
+          <Typography variant="caption" color="muted">Diligence: {diligenceRate}%</Typography>
         </div>
       </div>
     </div>
