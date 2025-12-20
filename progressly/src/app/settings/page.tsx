@@ -280,22 +280,22 @@ export default function SettingsPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 bg-gray-900/50">
-            <TabsTrigger value="account" className="flex items-center gap-2">
+          <TabsList className="grid w-full grid-cols-4 bg-gray-900/50 h-auto p-1">
+            <TabsTrigger value="account" className="flex flex-col sm:flex-row items-center gap-1 py-2 text-xs sm:text-sm">
               <UserIcon className="h-4 w-4" />
-              <span className="hidden sm:inline">Account</span>
+              <span>Profile</span>
             </TabsTrigger>
-            <TabsTrigger value="challenge" className="flex items-center gap-2">
+            <TabsTrigger value="challenge" className="flex flex-col sm:flex-row items-center gap-1 py-2 text-xs sm:text-sm">
               <Trophy className="h-4 w-4" />
-              <span className="hidden sm:inline">Challenge</span>
+              <span>Challenge</span>
             </TabsTrigger>
-            <TabsTrigger value="categories" className="flex items-center gap-2">
+            <TabsTrigger value="categories" className="flex flex-col sm:flex-row items-center gap-1 py-2 text-xs sm:text-sm">
               <Palette className="h-4 w-4" />
-              <span className="hidden sm:inline">Categories</span>
+              <span>Categories</span>
             </TabsTrigger>
-            <TabsTrigger value="goals" className="flex items-center gap-2">
+            <TabsTrigger value="goals" className="flex flex-col sm:flex-row items-center gap-1 py-2 text-xs sm:text-sm">
               <Target className="h-4 w-4" />
-              <span className="hidden sm:inline">Goals</span>
+              <span>Goals</span>
             </TabsTrigger>
           </TabsList>
 
@@ -422,7 +422,18 @@ export default function SettingsPage() {
                       Danger Zone
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="space-y-3">
+                    <Button 
+                      variant="outline" 
+                      className="w-full border-orange-600 text-orange-400 hover:bg-orange-600/10"
+                      onClick={() => router.push('/dashboard?newChallenge=true')}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Start New Challenge
+                    </Button>
+                    <p className="text-xs text-gray-500 text-center">
+                      Starting a new challenge will end your current one
+                    </p>
                     <Button 
                       variant="destructive" 
                       className="w-full"

@@ -2,20 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, MessageCircle, Target, User } from "lucide-react";
+import { Home, MessageCircle, Settings } from "lucide-react";
 import { useUser } from "@supabase/auth-helpers-react";
 import Image from "next/image";
 
 const navLinks = [
   {
     href: "/dashboard",
-    label: "Dashboard",
-    icon: LayoutDashboard,
-  },
-  {
-    href: "/goals",
-    label: "Goals",
-    icon: Target,
+    label: "Home",
+    icon: Home,
   },
   {
     href: "/chat",
@@ -23,9 +18,9 @@ const navLinks = [
     icon: MessageCircle,
   },
   {
-    href: "/account",
-    label: "Account",
-    icon: User,
+    href: "/settings",
+    label: "Settings",
+    icon: Settings,
   },
 ];
 
@@ -34,26 +29,29 @@ export default function BottomNav() {
   const user = useUser();
   
   // Get user's profile picture from Google/Gmail account
-  // Google OAuth provides avatar_url, other providers might use picture
   const profilePicture = user?.user_metadata?.avatar_url || 
                         user?.user_metadata?.picture;
 
   return (
-    <nav className="fixed bottom-0 w-full bg-black border-t border-gray-800 md:hidden z-50">
-      <div className="flex justify-around items-center h-16">
+    <nav className="fixed bottom-0 left-0 right-0 bg-black/90 backdrop-blur-xl border-t border-gray-800/50 md:hidden z-50 safe-area-pb">
+      <div className="flex justify-around items-center h-16 max-w-md mx-auto px-4">
         {navLinks.map((link) => {
           const isActive = pathname.startsWith(link.href);
-          const isAccountLink = link.href === "/account";
+          const isSettingsLink = link.href === "/settings";
           
           return (
             <Link
               key={link.href}
               href={link.href}
-              className="flex flex-col items-center justify-center gap-1 text-xs"
+              className={`flex flex-col items-center justify-center gap-1 py-2 px-4 rounded-xl transition-all duration-200 ${
+                isActive 
+                  ? "bg-accent/10" 
+                  : "hover:bg-gray-800/50"
+              }`}
             >
-              {isAccountLink && profilePicture ? (
-                <div className={`relative h-6 w-6 rounded-full overflow-hidden border-2 ${
-                  isActive ? "border-secondary" : "border-muted-foreground"
+              {isSettingsLink && profilePicture ? (
+                <div className={`relative h-6 w-6 rounded-full overflow-hidden ring-2 transition-all ${
+                  isActive ? "ring-accent" : "ring-gray-600"
                 }`}>
                   <Image
                     src={profilePicture}
@@ -65,14 +63,14 @@ export default function BottomNav() {
                 </div>
               ) : (
                 <link.icon
-                  className={`h-6 w-6 ${
-                    isActive ? "text-secondary" : "text-muted-foreground"
+                  className={`h-6 w-6 transition-colors ${
+                    isActive ? "text-accent" : "text-gray-400"
                   }`}
                 />
               )}
               <span
-                className={`${
-                  isActive ? "text-secondary" : "text-muted-foreground"
+                className={`text-[10px] font-medium transition-colors ${
+                  isActive ? "text-accent" : "text-gray-400"
                 }`}
               >
                 {link.label}
@@ -84,3 +82,4 @@ export default function BottomNav() {
     </nav>
   );
 }
+
