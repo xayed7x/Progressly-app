@@ -127,7 +127,7 @@ export function DailySummaryChart({ selectedDate, data }: DailySummaryChartProps
   // Format total minutes into human-readable string
   const formatTotalTime = (totalMinutes: number) => {
     const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
+    const minutes = Math.round(totalMinutes % 60);
 
     if (hours === 0) return `${minutes}m`;
     if (minutes === 0) return `${hours}h`;

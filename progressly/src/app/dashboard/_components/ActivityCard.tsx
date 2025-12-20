@@ -19,12 +19,27 @@ import {
 const formatTime = (timeStr: string | undefined) => {
   if (!timeStr) return "N/A";
   try {
-    const time = parse(timeStr, "HH:mm:ss", new Date());
-    return format(time, "h:mm a");
-  } catch (error) {
-    console.error("Invalid time format passed to formatTime:", timeStr);
-    return "Invalid Time";
+    // Try parsing as HH:mm:ss first
+    const timeWithSeconds = parse(timeStr, "HH:mm:ss", new Date());
+    if (!isNaN(timeWithSeconds.getTime())) {
+      return format(timeWithSeconds, "h:mm a");
+    }
+  } catch (e) {
+    // Ignore error and try next format
   }
+
+  try {
+    // Try parsing as HH:mm
+    const timeWithoutSeconds = parse(timeStr, "HH:mm", new Date());
+    if (!isNaN(timeWithoutSeconds.getTime())) {
+      return format(timeWithoutSeconds, "h:mm a");
+    }
+  } catch (e) {
+    // Ignore error
+  }
+
+  console.error("Invalid time format passed to formatTime:", timeStr);
+  return "Invalid Time";
 };
 
 export default function ActivityCard({

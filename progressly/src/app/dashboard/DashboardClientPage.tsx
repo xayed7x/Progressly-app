@@ -325,9 +325,12 @@ export default function DashboardClientPage({
   };
 
   // New handler for when an activity is logged
-  const handleActivityLogged = (newActivity: ActivityReadWithCategory) => {
+  const handleActivityLogged = (newActivity?: ActivityReadWithCategory) => {
+    // Clear optimistic activities since we now have the real data
+    setOptimisticActivities([]);
+    
     // Optimistically update the cache with the new activity AND the last_end_time
-    if (bootstrapData) {
+    if (bootstrapData && newActivity) {
       mutateBootstrap(
         {
           ...bootstrapData,
@@ -337,12 +340,12 @@ export default function DashboardClientPage({
         { revalidate: true } // Then revalidate from server
       );
     } else {
-      // If no bootstrap data yet, just force revalidation
+      // If no bootstrap data yet or no new activity, just force revalidation
       mutateBootstrap(undefined, { revalidate: true });
     }
 
     // Smart night sleep detection - only advance day for actual night sleep, not naps
-    if (newActivity.category?.name?.toLowerCase() === 'sleep') {
+    if (newActivity && newActivity.category?.name?.toLowerCase() === 'sleep') {
       const endTimeStr = newActivity.end_time; // Format: "HH:mm:ss"
       const startTimeStr = newActivity.start_time;
       

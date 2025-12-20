@@ -12,21 +12,32 @@
  */
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { format } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Play, Square, RefreshCw } from 'lucide-react';
+import { Play, Square, RefreshCw, AlertTriangle } from 'lucide-react';
 import type { Category, ActivityReadWithCategory } from '@/lib/types';
 import { logActivity } from '@/app/dashboard/activity-actions';
 import { createCategory } from '@/app/dashboard/category-actions';
 import { CATEGORY_CONFIG } from '@/lib/category-config';
 import { defaultActivityCategories, defaultCategoryHexColors } from '@/lib/constants';
 import { getSupabaseBrowserClient } from '@/lib/supabase-client';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 interface QuickTapLoggingProps {
   categories: Category[];
   onActivityLogged: (activity?: ActivityReadWithCategory) => void;
   addOptimisticActivity?: (activity: any) => void;
   selectedDate: Date;
+  lastEndTime?: string; // HH:MM:SS format
+  onSwitchToManual?: () => void; // Callback to switch to Manual Entry tab
 }
 
 interface RunningActivity {
@@ -44,11 +55,15 @@ interface QuickTapCategory {
 const STORAGE_KEY = 'progressly_running_activity';
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
+const GAP_THRESHOLD_MINUTES = 5; // Show warning if gap > 5 minutes
+
 export function QuickTapLogging({ 
   categories, 
   onActivityLogged, 
   addOptimisticActivity,
-  selectedDate 
+  selectedDate,
+  lastEndTime,
+  onSwitchToManual
 }: QuickTapLoggingProps) {
   const supabase = getSupabaseBrowserClient();
   const [runningActivity, setRunningActivity] = useState<RunningActivity | null>(null);
@@ -56,6 +71,11 @@ export function QuickTapLogging({
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Gap Warning State
+  const [showGapWarning, setShowGapWarning] = useState(false);
+  const [gapInfo, setGapInfo] = useState<{ from: string; to: string; minutes: number } | null>(null);
+  const [pendingCategory, setPendingCategory] = useState<QuickTapCategory | null>(null);
 
   // Build display categories: merge user categories with default presets
   const displayCategories = useMemo((): QuickTapCategory[] => {
@@ -178,7 +198,7 @@ export function QuickTapLogging({
             'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({
-            category_id: timer.categoryId,
+            category_id: String(timer.categoryId),
             category_name: timer.categoryName,
             start_time: timer.startTime
           })
@@ -247,14 +267,64 @@ export function QuickTapLogging({
   };
 
   const formatTimeForApi = (date: Date): string => {
-    return date.toTimeString().slice(0, 5);
+    return date.toTimeString().slice(0, 8); // Returns HH:MM:SS
   };
 
-  const handleStart = useCallback(async (category: QuickTapCategory) => {
-    if (runningActivity) {
-      await handleStop();
+  // Check for time gap
+  const checkForGap = useCallback((category: QuickTapCategory): boolean => {
+    if (!lastEndTime || runningActivity) return false; // No gap check if no prior activity or timer running
+    
+    try {
+      const now = new Date();
+      const todayStr = format(selectedDate, 'yyyy-MM-dd');
+      
+      // Parse lastEndTime (HH:MM:SS format)
+      const [hours, minutes, seconds] = lastEndTime.split(':').map(Number);
+      const lastEnd = new Date(todayStr);
+      lastEnd.setHours(hours, minutes, seconds || 0);
+      
+      // Calculate gap in minutes
+      const gapMs = now.getTime() - lastEnd.getTime();
+      const gapMinutes = Math.floor(gapMs / 1000 / 60);
+      
+      if (gapMinutes > GAP_THRESHOLD_MINUTES) {
+        // Format times for display
+        const fromTime = lastEnd.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+        const toTime = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+        
+        setGapInfo({ from: fromTime, to: toTime, minutes: gapMinutes });
+        setPendingCategory(category);
+        setShowGapWarning(true);
+        return true; // Gap exists
+      }
+    } catch (e) {
+      console.error('Error checking gap:', e);
     }
+    return false;
+  }, [lastEndTime, runningActivity, selectedDate]);
 
+  // Handle "Skip Anyway" - proceed with QuickTap
+  const handleSkipGap = useCallback(() => {
+    setShowGapWarning(false);
+    if (pendingCategory) {
+      startTimer(pendingCategory);
+    }
+    setPendingCategory(null);
+    setGapInfo(null);
+  }, [pendingCategory]);
+
+  // Handle "Log Gap" - switch to manual entry
+  const handleLogGap = useCallback(() => {
+    setShowGapWarning(false);
+    setPendingCategory(null);
+    setGapInfo(null);
+    if (onSwitchToManual) {
+      onSwitchToManual();
+    }
+  }, [onSwitchToManual]);
+
+  // Internal function to actually start the timer
+  const startTimer = useCallback(async (category: QuickTapCategory) => {
     let categoryId = category.id;
 
     // If this is a preset (not user's category), create it first
@@ -287,7 +357,18 @@ export function QuickTapLogging({
     
     // Sync to backend for cross-device
     syncTimerToBackend(newTimer);
-  }, [runningActivity]);
+  }, []);
+
+  // Public function that checks for gap first
+  const handleStart = useCallback((category: QuickTapCategory) => {
+    // Check if there's a time gap
+    const hasGap = checkForGap(category);
+    if (!hasGap) {
+      // No gap, start immediately
+      startTimer(category);
+    }
+    // If gap exists, the dialog will be shown and user will decide
+  }, [checkForGap, startTimer]);
 
   const handleStop = useCallback(async () => {
     if (!runningActivity || isSaving) return;
@@ -310,11 +391,12 @@ export function QuickTapLogging({
         return;
       }
 
-      const activityDate = selectedDate.toISOString().split('T')[0];
+      // Use format() for consistent local date - avoids timezone issues with toISOString()
+      const activityDate = format(selectedDate, 'yyyy-MM-dd');
 
       const formData = new FormData();
       formData.set('activity_name', runningActivity.categoryName);
-      formData.set('category_id', runningActivity.categoryId);
+      formData.set('category_id', String(runningActivity.categoryId));
       formData.set('start_time', startTimeStr);
       formData.set('end_time', endTimeStr);
 
@@ -326,7 +408,7 @@ export function QuickTapLogging({
           end_time: endTimeStr,
           activity_date: activityDate,
           category_id: runningActivity.categoryId,
-          category: categories.find(c => c.id === runningActivity.categoryId) || null,
+          category: categories.find(c => String(c.id) === String(runningActivity.categoryId)) || null,
           isPendingSync: true,
         };
         addOptimisticActivity(optimisticActivity);
@@ -445,6 +527,46 @@ export function QuickTapLogging({
           Tap to start • Synced across devices
         </p>
       </CardContent>
+
+      {/* Gap Warning Dialog */}
+      <Dialog open={showGapWarning} onOpenChange={setShowGapWarning}>
+        <DialogContent className="sm:max-w-md bg-gray-900 border-gray-800 text-white">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-400">
+              <AlertTriangle className="h-5 w-5" />
+              Time Gap Detected
+            </DialogTitle>
+            <DialogDescription className="text-gray-400 pt-2">
+              {gapInfo && (
+                <>
+                  Your last activity ended at <span className="text-white font-medium">{gapInfo.from}</span>.
+                  <br />
+                  Please log what you did from <span className="text-white font-medium">{gapInfo.from}</span> to <span className="text-white font-medium">{gapInfo.to}</span> first.
+                  <br />
+                  <span className="text-amber-400/80 text-sm mt-2 block">
+                    ({Math.floor(gapInfo.minutes / 60)}h {gapInfo.minutes % 60}m untracked)
+                  </span>
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={handleSkipGap}
+              className="border-gray-700 text-gray-300 hover:bg-gray-800"
+            >
+              Skip & Start Anyway
+            </Button>
+            <Button
+              onClick={handleLogGap}
+              className="bg-accent text-black hover:bg-accent/90"
+            >
+              Log Gap Activity
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

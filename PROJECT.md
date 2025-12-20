@@ -1,6 +1,6 @@
 # Progressly - Project Constitution
 
-> **Last Updated:** December 18, 2024
+> **Last Updated:** December 20, 2024
 > 
 > This is the single source of truth for the Progressly application. Review this file for full context before making any changes.
 
@@ -8,7 +8,7 @@
 
 ## 📋 Overview
 
-**Progressly** is a personal productivity and time-tracking application that allows users to log their daily activities, set goals, and visualize their progress. The unique feature is the **"Wake-up to Wake-up"** day cycle that reflects natural sleep patterns rather than arbitrary midnight boundaries.
+**Progressly** is a personal productivity and time-tracking application that allows users to log their daily activities, set goals, complete challenges, and visualize their progress. Features include **100-day consistency challenges**, **AI coaching**, and **"Wake-up to Wake-up"** day cycle that reflects natural sleep patterns.
 
 ---
 
@@ -18,10 +18,10 @@
 
 | Layer | Technology |
 |-------|------------|
-| **Frontend** | Next.js 14 (App Router), TypeScript, TailwindCSS |
+| **Frontend** | Next.js 15 (App Router), TypeScript, TailwindCSS, Recharts |
 | **Backend** | FastAPI (Python), SQLModel |
 | **Database** | PostgreSQL (Supabase) |
-| **Auth** | Supabase Auth |
+| **Auth** | Supabase Auth (Google OAuth) |
 | **Hosting** | Frontend: Vercel, Backend: Render |
 
 ### Directory Structure
@@ -31,21 +31,30 @@ progressly-app/
 ├── progressly/                 # Next.js Frontend
 │   └── src/
 │       ├── app/
-│       │   ├── dashboard/      # Main activity tracking
-│       │   ├── goals/          # Goals & daily targets
+│       │   ├── dashboard/      # Main activity tracking + Challenge Dashboard
+│       │   ├── analytics/      # Analytics & Insights (NEW)
+│       │   ├── settings/       # Unified Settings (NEW - replaces /goals, /account)
 │       │   ├── chat/           # AI chat feature
 │       │   ├── auth/           # Authentication
 │       │   └── onboarding/     # New user onboarding
 │       ├── components/ui/      # Reusable UI components
-│       └── lib/                # Utilities, types, API clients
+│       └── lib/                # Utilities, types, API clients, services
 │
 ├── progressly-api/             # FastAPI Backend
-│   ├── main.py                 # Main API endpoints
+│   ├── main.py                 # Main API entry + routers
 │   ├── models.py               # SQLModel database models
 │   ├── routers/                # API route modules
+│   │   ├── activities.py
+│   │   ├── categories.py
+│   │   ├── challenges.py       # Challenge CRUD + abandon
+│   │   ├── targets.py
+│   │   ├── ai.py
+│   │   └── goals.py
 │   └── dependencies.py         # Auth & DB dependencies
 │
-└── schema.sql                  # Database schema reference
+├── schema.sql                  # Database schema reference
+├── PROGRESS.md                 # Session-by-session progress tracker
+└── PROJECT.md                  # This file (constitution)
 ```
 
 ---
@@ -60,7 +69,10 @@ progressly-app/
 | `category` | Activity categories (Work, Sleep, etc.) |
 | `logged_activity` | Individual activity entries with `effective_date` |
 | `daily_target` | Daily time targets per category |
-| `user_sessions` | **NEW:** End My Day state for cross-device sync |
+| `user_sessions` | End My Day state for cross-device sync |
+| `challenges` | 100-day consistency challenges |
+| `daily_challenge_metrics` | Daily stats for challenges |
+| `behavior_patterns` | Detected user patterns |
 | `conversations` | AI chat conversations |
 | `messages` | Chat messages |
 
@@ -68,71 +80,93 @@ progressly-app/
 
 - `LoggedActivity` → `Category` (many-to-one)
 - `Message` → `Conversation` (many-to-one)
+- `DailyChallengeMetrics` → `Challenge` (many-to-one)
 
 ---
 
 ## ✨ Implemented Features
 
-### 1. Activity Logging
+### 1. Challenge System (NEW)
+- **100-day consistency challenges**
+- Challenge setup wizard (duration, commitments)
+- Challenge Dashboard with progress tracking
+- Abandon/complete challenge functionality
+- Day-by-day metrics and completion rates
+
+### 2. Activity Logging
 - Log activities with name, start/end time, category
+- **Quick Tap Logging** - One-tap timer-based logging
+- **Voice Logging** - Speech-to-text activity entry
+- Manual entry with animated placeholders
 - Automatic overnight activity detection
 - Category color coding
 
-### 2. Dashboard
-- Daily activity list
-- Pie chart visualization
-- Previous/Next day navigation
-- Activities wrapper with edit/delete
+### 3. Dashboard
+- **Coach Insight** - AI-generated daily motivation
+- **Challenge Header** - Current challenge & progress
+- **Log Center** - Quick Log & Manual Entry tabs
+- **Today's Commitments** - Target activities
+- **Day Selector** - Navigation between dates
+- **Activity List** - Daily logged activities
+- **Daily Summary Chart** - Pie/Bar chart visualization
+- **Overall Progress** - Dual ring indicators
+- **Heatmap Calendar** - GitHub-style activity viz
+- **End of Day Summary** - Daily recap modal
 
-### 3. Day Cycle System (Wake-up to Wake-up)
+### 4. Analytics Dashboard (NEW)
+- **Overview Tab** - Today/Week/Month totals, daily average, top categories
+- **Trends Tab** - Line chart (30 days), Bar chart (weekly comparison)
+- **Patterns Tab** - Behavioral insights
+- **Comparison Tab** - Target vs Actual with progress bars
 
-**Smart Night Sleep Detection:**
-- Day advances ONLY when:
-  - Sleep activity ends between **4 AM - 12 PM**
-  - Sleep duration >= **2 hours**
-- Naps (afternoon sleep) do NOT trigger day change
+### 5. Settings Page (NEW - Unified)
+- **Profile Tab** - User info, logout
+- **Challenge Tab** - Edit name, view commitments, abandon
+- **Categories Tab** - Add/delete categories
+- **Goals Tab** - Big dream goal, daily targets per category
 
-**Manual "End My Day" Button:**
-- Golden accent button appears when not on today's date
-- Click to manually advance to next day
-- Useful when sleep logging is missed
+### 6. Categories
+- Default: Work, Study, Exercise, Leisure, Sleep, Social, Self-care, Other, Spiritual, Skill, Health, Family, Eating
+- Custom category creation with color picker
+- Delete with warning (activities become uncategorized)
 
-**Backend `effective_date`:**
-- API returns `effective_date` based on sleep patterns
-- Frontend initializes `selectedDate` from this value
-
-### 4. Categories
-- Default categories: Work, Study, Exercise, Leisure, Sleep, Social, Self-care, Other
-- Custom category creation
-- Category colors
-
-### 5. Daily Targets
+### 7. Daily Targets
 - Set hourly targets per category
 - Progress tracking against targets
-- Edit/delete targets
+- Visual comparison in Analytics
 
-### 6. Goals
-- User goals (set during onboarding)
-- Goals page with target list
-
-### 7. Chat (AI)
+### 8. AI Chat
 - AI assistant for productivity advice
+- Context-aware coaching (has access to user's goals & progress)
 - Conversation history
 
-### 8. Authentication
-- Supabase Auth (email/password)
+### 9. Authentication
+- Supabase Auth with Google OAuth
+- Protected routes via middleware
 - Email verification
-- Protected routes
+
+---
+
+## 🧭 Navigation
+
+### Mobile Bottom Nav (4 items)
+| Icon | Label | Route |
+|------|-------|-------|
+| 🏠 | Home | `/dashboard` |
+| 📊 | Analytics | `/analytics` |
+| 💬 | Chat | `/chat` |
+| ⚙️ | Settings | `/settings` |
 
 ---
 
 ## 🔗 API Endpoints
 
 ### Dashboard
-- `GET /api/dashboard-bootstrap` - All data for dashboard (activities, categories, pie chart, effective_date)
+- `GET /api/dashboard-bootstrap` - All data for dashboard
 
 ### Activities
 - `GET /api/activities?target_date=YYYY-MM-DD` - Activities for date
+- `GET /api/activities?days=N` - Last N days of activities
 - `POST /api/activities` - Create activity
 - `PUT /api/activities/{id}` - Update activity
 - `DELETE /api/activities/{id}` - Delete activity
@@ -140,6 +174,15 @@ progressly-app/
 ### Categories
 - `GET /api/categories` - User's categories
 - `POST /api/categories` - Create category
+- `PUT /api/categories/{id}` - Update category
+- `DELETE /api/categories/{id}` - Delete category
+
+### Challenges
+- `GET /api/challenges/active` - Active challenge
+- `POST /api/challenges` - Create challenge
+- `PUT /api/challenges/{id}` - Update challenge
+- `POST /api/challenges/{id}/abandon` - Abandon challenge
+- `DELETE /api/challenges/{id}` - Delete challenge
 
 ### Targets
 - `GET /api/targets` - User's daily targets
@@ -150,6 +193,10 @@ progressly-app/
 - `GET /api/goals` - User's goals
 - `POST /api/goals` - Create goal
 
+### AI
+- `POST /api/chat` - Send message to AI coach
+- `POST /api/ai/daily-insight` - Generate daily insight
+
 ---
 
 ## 🎨 UI Components
@@ -157,16 +204,25 @@ progressly-app/
 ### Dashboard Components
 | Component | Purpose |
 |-----------|---------|
-| `ActivityLogger` | Form to log new activities |
-| `DaySelector` | Day navigation + End My Day button |
+| `ChallengeDashboard` | Main dashboard when challenge active |
+| `ChallengeSetup` | Wizard to create new challenge |
+| `QuickTapLogging` | One-tap timer logging |
+| `VoiceLogging` | Speech-to-text logging |
+| `ActivityLogger` | Manual activity form |
+| `DaySelector` | Day navigation + End My Day |
 | `ActivitiesWrapper` | Activity list container |
 | `ActivityCard` | Individual activity display |
-| `DailySummaryChart` | Pie chart visualization |
-| `CategorySelect` | Category dropdown |
+| `DailySummaryChart` | Pie/Bar chart |
+| `HeatmapCalendar` | GitHub-style activity calendar |
+| `DualRingProgress` | Challenge/daily progress rings |
+| `EndOfDaySummary` | Daily recap modal |
+| `DailyCoachInsight` | AI motivation widget |
+| `PatternInsights` | Detected patterns display |
 
 ### Design System
-- **Primary Color:** Accent (golden/amber)
+- **Primary Color:** Accent (golden/amber `#f5c542`)
 - **Background:** Black with gradient blurs
+- **Glass Effect:** `bg-gray-900/50 backdrop-blur-xl`
 - **Font:** Custom serif headings, sans-serif body
 
 ---
@@ -187,49 +243,48 @@ SUPABASE_URL=
 SUPABASE_ANON_KEY=
 FRONTEND_URL=
 CLEANUP_SECRET_TOKEN=
+ANTHROPIC_API_KEY=
 ```
 
 ---
 
 ## 📝 Recent Changes Log
 
-### December 20, 2024 - **Effective Date System Upgrade** 🎉
+### December 20, 2024 - **Phase 11: Analytics Dashboard** ✅
 
-**Major Feature: Psychological Day Tracking**
-
-The app now tracks your "psychological day" (sleep-to-sleep) instead of calendar day:
-
+**New Features:**
 | Feature | Description |
 |---------|-------------|
-| **Cross-Device Sync** | `user_sessions` table stores current day - syncs between mobile & desktop |
-| **End My Day Button** | Manual day advancement with lock to prevent double-clicks |
-| **Timezone-Safe Dates** | Using `format()` instead of `toISOString()` for consistent local dates |
-| **Effective Date Column** | `loggedactivity.effective_date` field for "psychological day" assignment |
+| **Analytics Page** | `/analytics` with 4 tabs: Overview, Trends, Patterns, Comparison |
+| **Settings Page** | Unified `/settings` replaces `/goals` and `/account` |
+| **Bottom Nav Update** | 4 items: Home, Analytics, Chat, Settings |
 
-**Database Changes:**
-- Added `user_sessions` table for End My Day persistence
-- Added `effective_date` column to `loggedactivity` table
-- Added indexes for performance
+**API Additions:**
+- `PUT /api/categories/{id}` - Update category
+- `DELETE /api/categories/{id}` - Delete category
+- `PUT /api/challenges/{id}` - Update challenge
+- `POST /api/challenges/{id}/abandon` - Abandon challenge
 
-**Backend Changes:**
-- `POST /api/end-day` - Saves End My Day state to database
-- `GET /api/dashboard-bootstrap` - Returns `effective_date` from `user_sessions`
-- Activity creation uses frontend's `target_date` directly as `effective_date`
+**Deleted Pages:**
+- `/goals` → Merged into `/settings` (Goals tab)
+- `/account` → Merged into `/settings` (Profile tab)
 
-**Frontend Changes:**
-- Backend `effective_date` is now the source of truth (not localStorage)
-- All date formatting uses `format()` for timezone consistency
-- Added debug logging throughout date flow
+### December 20, 2024 - **Challenge System + Dashboard Overhaul**
 
-### December 18, 2024
-- **Smart Day Change:** Day no longer changes at midnight
-- **Night Sleep Detection:** Sleep must end 4AM-12PM AND duration >= 2hr to advance day
-- **End My Day Button:** Manual day advancement with localStorage persistence
-- **effective_date API:** Backend returns user's current "day" based on sleep patterns
-- **localStorage Priority:** Manual day end persists on hard refresh (24hr expiry)
-- **SWR Auth Fix:** Data fetching waits for user authentication
-- **last_end_time Update:** Start Time field updates after logging activity
+- Implemented 100-day consistency challenge system
+- Created ChallengeSetup wizard (5-step flow)
+- Built ChallengeDashboard with "Action-First" layout
+- Integrated QuickTapLogging with cross-device timer sync
+- Added VoiceLogging with Web Speech API
+- Created HeatmapCalendar, DualRingProgress, EndOfDaySummary
+- Fixed various z-index and styling issues
 
+### December 20, 2024 - **Effective Date System Upgrade**
+
+- Cross-device sync via `user_sessions` table
+- End My Day button with lock mechanism
+- Timezone-safe date formatting
+- `effective_date` column for psychological day assignment
 
 ---
 
@@ -237,7 +292,7 @@ The app now tracks your "psychological day" (sleep-to-sleep) instead of calendar
 
 ### Frontend (Vercel)
 - Auto-deploys from `main` branch
-- Domain: https://autex.vercel.app/
+- Domain: https://progressly-app.vercel.app/
 
 ### Backend (Render)
 - Auto-deploys from `main` branch
@@ -260,7 +315,7 @@ npm run dev
 ```bash
 cd progressly-api
 pip install -r requirements.txt
-uvicorn main:app --reload
+python run.py
 ```
 
 ---
@@ -268,10 +323,12 @@ uvicorn main:app --reload
 ## 📌 Important Notes
 
 1. **Day Boundary Logic:** Always consider wake-up to wake-up, not midnight
-2. **Offline Support:** IndexedDB for offline activity queuing (partial)
+2. **Single Active Challenge:** Only one challenge can be active at a time
 3. **Categories:** "Sleep" category is special - triggers day detection
 4. **Time Format:** API uses 24-hour format (HH:MM:SS)
+5. **Patterns Tab:** Currently shows static insights (to be made dynamic)
 
 ---
 
 > **To update this document:** After implementing new features, add them to the appropriate section above.
+

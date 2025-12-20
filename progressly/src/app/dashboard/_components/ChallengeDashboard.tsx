@@ -91,6 +91,7 @@ export function ChallengeDashboard({
 }: ChallengeDashboardProps) {
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [commitmentProgress, setCommitmentProgress] = useState<Record<string, CommitmentProgress>>({});
+  const [activeLogTab, setActiveLogTab] = useState("quick");
 
   const today = new Date().toISOString().split('T')[0];
 
@@ -185,7 +186,7 @@ export function ChallengeDashboard({
       </Card>
 
       {/* Log Center (Tabs) */}
-      <Tabs defaultValue="quick" className="w-full">
+      <Tabs value={activeLogTab} onValueChange={setActiveLogTab} className="w-full">
         <TabsList className="grid w-full grid-cols-2 mb-4 bg-white/5 border border-white/10 p-1 rounded-lg">
           <TabsTrigger 
             value="quick"
@@ -207,6 +208,8 @@ export function ChallengeDashboard({
             onActivityLogged={onActivityLogged}
             addOptimisticActivity={addOptimisticActivity}
             selectedDate={selectedDate}
+            lastEndTime={lastEndTime}
+            onSwitchToManual={() => setActiveLogTab("manual")}
           />
         </TabsContent>
         <TabsContent value="manual" className="mt-0">
