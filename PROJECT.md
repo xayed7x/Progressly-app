@@ -135,10 +135,20 @@ progressly-app/
 - Progress tracking against targets
 - Visual comparison in Analytics
 
-### 8. AI Chat
-- AI assistant for productivity advice
-- Context-aware coaching (has access to user's goals & progress)
-- Conversation history
+### 8. AI Chat (Enhanced)
+- **Psychology-Informed Coaching**
+  - AVE Prevention (Abstinence Violation Effect) - External attribution for setbacks
+  - Identity Reinforcement - References user's challenge identity statement
+  - Pattern-Based Advice - Uses specific data from behavioral patterns
+  - Asymmetric Celebration - Big celebrations for milestones and resilience
+- **Comprehensive Context Building**
+  - Challenge info (name, day X/Y, commitments, identity/why statements)
+  - Today's progress per commitment
+  - Last 7 days summary with visual indicators
+  - Current & longest streak calculations
+  - Goals and daily targets
+- **Concise, Actionable Responses** - 2-3 sentences for simple questions
+- Conversation history persistence
 
 ### 9. Authentication
 - Supabase Auth with Google OAuth
@@ -249,6 +259,23 @@ ANTHROPIC_API_KEY=
 ---
 
 ## 📝 Recent Changes Log
+
+### December 20, 2024 - **AI Coach Enhancement** ✅
+
+**Psychology-Informed Coaching:**
+- AVE Prevention (Abstinence Violation Effect) - External attribution for setbacks
+- Identity Reinforcement - References user's challenge identity statement
+- Pattern-Based Advice - Data-driven, not generic motivation
+- Asymmetric Celebration - Milestone and resilience recognition
+
+**New Files:**
+- `services/ai_context_builder.py` - Comprehensive context builder
+- `utils/metrics.py` - Streak calculation utilities
+
+**Modified:**
+- `routers/ai.py` - Enhanced system prompt + context integration
+
+---
 
 ### December 20, 2024 - **Phase 11: Analytics Dashboard** ✅
 
