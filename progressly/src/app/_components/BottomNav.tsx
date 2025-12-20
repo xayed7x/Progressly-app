@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, MessageCircle, Settings } from "lucide-react";
+import { Home, MessageCircle, Settings, BarChart3 } from "lucide-react";
 import { useUser } from "@supabase/auth-helpers-react";
 import Image from "next/image";
 
@@ -11,6 +11,11 @@ const navLinks = [
     href: "/dashboard",
     label: "Home",
     icon: Home,
+  },
+  {
+    href: "/analytics",
+    label: "Analytics",
+    icon: BarChart3,
   },
   {
     href: "/chat",

@@ -1,0 +1,506 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { 
+  Loader2, BarChart3, TrendingUp, Brain, Target, Clock, 
+  Calendar, Zap, Trophy, ArrowLeft, ArrowUp, ArrowDown, Minus, Lightbulb
+} from "lucide-react";
+import { 
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, Cell, Legend
+} from "recharts";
+import { getAnalyticsOverview, getTrendsData, getComparisonData } from "./actions";
+
+interface OverviewData {
+  todayTotal: number;
+  weekTotal: number;
+  monthTotal: number;
+  dailyAverage: number;
+  topCategories: { name: string; duration: number }[];
+  challengeProgress: { name: string; dayNumber: number; totalDays: number; percentComplete: number } | null;
+  activityCount: { today: number; week: number; month: number };
+}
+
+interface TrendData {
+  date: string;
+  total: number;
+  [key: string]: string | number;
+}
+
+interface ComparisonData {
+  category: string;
+  color: string;
+  target: number;
+  actual: number;
+  percentage: number;
+  difference: number;
+}
+
+const formatDuration = (minutes: number) => {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (hours === 0) return `${mins}m`;
+  if (mins === 0) return `${hours}h`;
+  return `${hours}h ${mins}m`;
+};
+
+export default function AnalyticsPage() {
+  const [activeTab, setActiveTab] = useState("overview");
+  const [isLoading, setIsLoading] = useState(true);
+  const [overview, setOverview] = useState<OverviewData | null>(null);
+  const [trends, setTrends] = useState<TrendData[]>([]);
+  const [comparison, setComparison] = useState<ComparisonData[]>([]);
+  
+  const router = useRouter();
+
+  useEffect(() => {
+    const loadData = async () => {
+      setIsLoading(true);
+      try {
+        const [overviewRes, trendsRes, comparisonRes] = await Promise.all([
+          getAnalyticsOverview(),
+          getTrendsData(30),
+          getComparisonData(),
+        ]);
+
+        if (overviewRes.success && overviewRes.data) {
+          setOverview(overviewRes.data);
+        }
+        if (trendsRes.success && trendsRes.data) {
+          setTrends(trendsRes.data);
+        }
+        if (comparisonRes.success && comparisonRes.data) {
+          setComparison(comparisonRes.data);
+        }
+      } catch (error) {
+        console.error("Error loading analytics:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        <Loader2 className="animate-spin h-8 w-8 text-accent" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-black text-white pb-24">
+      {/* Background */}
+      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-accent/20 rounded-full blur-[100px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/20 rounded-full blur-[100px]" />
+      </div>
+
+      <div className="relative z-10 p-4 max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-6">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => router.push('/dashboard')}
+            className="text-gray-400 hover:text-white"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <BarChart3 className="h-6 w-6 text-accent" />
+              Analytics
+            </h1>
+            <p className="text-sm text-gray-400">Your productivity insights</p>
+          </div>
+        </div>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4 bg-gray-900/50 h-auto p-1">
+            <TabsTrigger value="overview" className="flex flex-col sm:flex-row items-center gap-1 py-2 text-xs sm:text-sm">
+              <Zap className="h-4 w-4" />
+              <span>Overview</span>
+            </TabsTrigger>
+            <TabsTrigger value="trends" className="flex flex-col sm:flex-row items-center gap-1 py-2 text-xs sm:text-sm">
+              <TrendingUp className="h-4 w-4" />
+              <span>Trends</span>
+            </TabsTrigger>
+            <TabsTrigger value="patterns" className="flex flex-col sm:flex-row items-center gap-1 py-2 text-xs sm:text-sm">
+              <Brain className="h-4 w-4" />
+              <span>Patterns</span>
+            </TabsTrigger>
+            <TabsTrigger value="comparison" className="flex flex-col sm:flex-row items-center gap-1 py-2 text-xs sm:text-sm">
+              <Target className="h-4 w-4" />
+              <span>Compare</span>
+            </TabsTrigger>
+          </TabsList>
+
+          {/* ==================== OVERVIEW TAB ==================== */}
+          <TabsContent value="overview" className="space-y-4">
+            {/* Metric Cards */}
+            <div className="grid grid-cols-2 gap-3">
+              <Card className="bg-gray-900/50 backdrop-blur-xl border-gray-800">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 text-gray-400 text-sm mb-1">
+                    <Clock className="h-4 w-4" />
+                    Today
+                  </div>
+                  <p className="text-2xl font-bold text-white">
+                    {formatDuration(overview?.todayTotal || 0)}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {overview?.activityCount.today || 0} activities
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-gray-900/50 backdrop-blur-xl border-gray-800">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 text-gray-400 text-sm mb-1">
+                    <Calendar className="h-4 w-4" />
+                    This Week
+                  </div>
+                  <p className="text-2xl font-bold text-white">
+                    {formatDuration(overview?.weekTotal || 0)}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {overview?.activityCount.week || 0} activities
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-gray-900/50 backdrop-blur-xl border-gray-800">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 text-gray-400 text-sm mb-1">
+                    <TrendingUp className="h-4 w-4" />
+                    This Month
+                  </div>
+                  <p className="text-2xl font-bold text-white">
+                    {formatDuration(overview?.monthTotal || 0)}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {overview?.activityCount.month || 0} activities
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-gray-900/50 backdrop-blur-xl border-gray-800">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 text-gray-400 text-sm mb-1">
+                    <Zap className="h-4 w-4" />
+                    Daily Avg
+                  </div>
+                  <p className="text-2xl font-bold text-accent">
+                    {formatDuration(Math.round(overview?.dailyAverage || 0))}
+                  </p>
+                  <p className="text-xs text-gray-500">per active day</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Challenge Progress */}
+            {overview?.challengeProgress && (
+              <Card className="bg-gradient-to-r from-accent/10 to-blue-500/10 backdrop-blur-xl border-gray-800">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Trophy className="h-8 w-8 text-accent" />
+                      <div>
+                        <p className="font-semibold text-white">{overview.challengeProgress.name}</p>
+                        <p className="text-sm text-gray-400">
+                          Day {overview.challengeProgress.dayNumber} of {overview.challengeProgress.totalDays}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-accent">
+                        {overview.challengeProgress.percentComplete}%
+                      </p>
+                      <p className="text-xs text-gray-400">complete</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Top Categories */}
+            <Card className="bg-gray-900/50 backdrop-blur-xl border-gray-800">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-white text-lg">Top Categories This Week</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {overview?.topCategories.map((cat, idx) => (
+                    <div key={cat.name} className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className="text-gray-500 text-sm w-4">{idx + 1}</span>
+                        <span className="text-white">{cat.name}</span>
+                      </div>
+                      <span className="text-gray-400">{formatDuration(cat.duration)}</span>
+                    </div>
+                  ))}
+                  {(!overview?.topCategories || overview.topCategories.length === 0) && (
+                    <p className="text-gray-500 text-center py-4">No data yet</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ==================== TRENDS TAB ==================== */}
+          <TabsContent value="trends" className="space-y-4">
+            <Card className="bg-gray-900/50 backdrop-blur-xl border-gray-800">
+              <CardHeader>
+                <CardTitle className="text-white">Daily Activity (Last 30 Days)</CardTitle>
+                <CardDescription className="text-gray-400">
+                  Total minutes tracked per day
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {trends.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={trends}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                      <XAxis 
+                        dataKey="date" 
+                        stroke="#666"
+                        tick={{ fill: '#999', fontSize: 10 }}
+                        tickFormatter={(value) => {
+                          const date = new Date(value);
+                          return `${date.getMonth() + 1}/${date.getDate()}`;
+                        }}
+                      />
+                      <YAxis 
+                        stroke="#666"
+                        tick={{ fill: '#999', fontSize: 10 }}
+                        tickFormatter={(value) => `${Math.round(value / 60)}h`}
+                      />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: '#1a1a1a',
+                          border: '1px solid #333',
+                          borderRadius: '8px'
+                        }}
+                        labelStyle={{ color: '#fff' }}
+                        formatter={(value: number) => [formatDuration(value), 'Total']}
+                        labelFormatter={(label) => new Date(label).toLocaleDateString()}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="total" 
+                        stroke="#f5c542" 
+                        strokeWidth={2}
+                        dot={{ fill: '#f5c542', strokeWidth: 0, r: 3 }}
+                        activeDot={{ r: 6, fill: '#f5c542' }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[300px] flex items-center justify-center text-gray-500">
+                    No trend data available
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Weekly Summary */}
+            <Card className="bg-gray-900/50 backdrop-blur-xl border-gray-800">
+              <CardHeader>
+                <CardTitle className="text-white">Weekly Comparison</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {trends.length >= 7 ? (
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={trends.slice(-7)}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                      <XAxis 
+                        dataKey="date" 
+                        stroke="#666"
+                        tick={{ fill: '#999', fontSize: 10 }}
+                        tickFormatter={(value) => {
+                          const date = new Date(value);
+                          return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][date.getDay()];
+                        }}
+                      />
+                      <YAxis 
+                        stroke="#666"
+                        tick={{ fill: '#999', fontSize: 10 }}
+                        tickFormatter={(value) => `${Math.round(value / 60)}h`}
+                      />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: '#1a1a1a',
+                          border: '1px solid #333',
+                          borderRadius: '8px'
+                        }}
+                        formatter={(value: number) => [formatDuration(value), 'Total']}
+                      />
+                      <Bar dataKey="total" fill="#f5c542" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[200px] flex items-center justify-center text-gray-500">
+                    Need at least 7 days of data
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ==================== PATTERNS TAB ==================== */}
+          <TabsContent value="patterns" className="space-y-4">
+            <Card className="bg-gray-900/50 backdrop-blur-xl border-gray-800">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <Lightbulb className="h-5 w-5 text-accent" />
+                  Behavioral Patterns
+                </CardTitle>
+                <CardDescription className="text-gray-400">
+                  Insights based on your activity patterns
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Pattern Cards */}
+                  <div className="bg-black/30 p-4 rounded-xl border border-gray-800">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-orange-500/10 rounded-lg">
+                        <Brain className="h-5 w-5 text-orange-500" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-white">Peak Productivity Hours</p>
+                        <p className="text-sm text-gray-400 mt-1">
+                          Your most productive hours are typically between 9 AM - 12 PM based on your activity data.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-black/30 p-4 rounded-xl border border-gray-800">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-green-500/10 rounded-lg">
+                        <TrendingUp className="h-5 w-5 text-green-500" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-white">Weekly Trends</p>
+                        <p className="text-sm text-gray-400 mt-1">
+                          You tend to be more consistent on weekdays. Consider scheduling important tasks during these times.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-black/30 p-4 rounded-xl border border-gray-800">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-blue-500/10 rounded-lg">
+                        <Target className="h-5 w-5 text-blue-500" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-white">Category Focus</p>
+                        <p className="text-sm text-gray-400 mt-1">
+                          Your top category receives the most attention. Consider balancing time across other important areas.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 text-center">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => router.push('/dashboard')}
+                    className="gap-2"
+                  >
+                    <Lightbulb className="h-4 w-4" />
+                    View Detailed Patterns on Dashboard
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ==================== COMPARISON TAB ==================== */}
+          <TabsContent value="comparison" className="space-y-4">
+            <Card className="bg-gray-900/50 backdrop-blur-xl border-gray-800">
+              <CardHeader>
+                <CardTitle className="text-white">Target vs Actual</CardTitle>
+                <CardDescription className="text-gray-400">
+                  Daily average this week compared to your targets
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {comparison.length > 0 ? (
+                  <div className="space-y-4">
+                    {comparison.map((item) => {
+                      const isOver = item.percentage > 100;
+                      const isUnder = item.percentage < 80;
+                      const StatusIcon = isOver ? ArrowUp : isUnder ? ArrowDown : Minus;
+                      const statusColor = isOver ? 'text-green-400' : isUnder ? 'text-red-400' : 'text-gray-400';
+
+                      return (
+                        <div key={item.category} className="bg-black/30 p-4 rounded-xl border border-gray-800">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-3">
+                              <div 
+                                className="w-3 h-3 rounded-full" 
+                                style={{ backgroundColor: item.color }}
+                              />
+                              <span className="font-medium text-white">{item.category}</span>
+                            </div>
+                            <div className={`flex items-center gap-1 ${statusColor}`}>
+                              <StatusIcon className="h-4 w-4" />
+                              <span className="text-sm font-semibold">{item.percentage}%</span>
+                            </div>
+                          </div>
+                          
+                          {/* Progress bar */}
+                          <div className="relative h-3 bg-gray-800 rounded-full overflow-hidden mb-2">
+                            <div 
+                              className="absolute h-full bg-gray-600 rounded-full"
+                              style={{ width: '100%' }}
+                            />
+                            <div 
+                              className="absolute h-full rounded-full transition-all"
+                              style={{ 
+                                width: `${Math.min(item.percentage, 100)}%`,
+                                backgroundColor: item.color
+                              }}
+                            />
+                          </div>
+                          
+                          <div className="flex justify-between text-xs text-gray-400">
+                            <span>Actual: {item.actual}h/day</span>
+                            <span>Target: {item.target}h/day</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="py-12 text-center text-gray-500">
+                    <Target className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>No targets set yet</p>
+                    <Button 
+                      variant="outline" 
+                      className="mt-4"
+                      onClick={() => router.push('/settings?tab=goals')}
+                    >
+                      Set Daily Targets
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  );
+}
