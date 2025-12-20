@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, ArrowRight, Check, Target, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { createGoal, saveDailyTarget, getCategories } from "@/app/goals/actions";
+import { createGoal, saveDailyTarget, getCategories } from "@/app/settings/actions";
 import { defaultActivityCategories, defaultCategoryHexColors } from "@/lib/constants";
 
 const onboardingPlaceholders = [
@@ -93,9 +93,7 @@ export default function OnboardingPage() {
 
     setIsLoading(true);
     try {
-      const formData = new FormData();
-      formData.append("goal", goal);
-      const result = await createGoal(formData);
+      const result = await createGoal(goal);
       
       if (!result.success) {
         throw new Error(result.error);
