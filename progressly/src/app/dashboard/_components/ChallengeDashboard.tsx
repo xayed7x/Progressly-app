@@ -124,7 +124,15 @@ export function ChallengeDashboard({
         const totalMinutes = relevantActivities.reduce((sum, a) => {
           const [h1, m1] = a.start_time.split(':').map(Number);
           const [h2, m2] = a.end_time.split(':').map(Number);
-          return sum + ((h2 * 60 + m2) - (h1 * 60 + m1));
+          const startMin = h1 * 60 + m1;
+          const endMin = h2 * 60 + m2;
+          
+          // Handle overnight activities (e.g., 23:00 to 01:00)
+          let duration = endMin - startMin;
+          if (duration < 0) {
+            duration += 24 * 60; // Add 24 hours if overnight
+          }
+          return sum + duration;
         }, 0);
         
         const actualHours = totalMinutes / 60;
