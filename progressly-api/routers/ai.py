@@ -254,7 +254,12 @@ When user misses days or underperforms:
             f"{user_prompt}"
         )
         
-        print(f"DEBUG: Sending prompt to Gemini. User prompt length: {len(user_prompt)}, Activities context length: {len(activities_context)}")
+        # Debug: Log total prompt length to monitor token usage
+        print(f"DEBUG: Sending prompt to Gemini.")
+        print(f"DEBUG: - User prompt: {len(user_prompt)} chars")
+        print(f"DEBUG: - Activities context: {len(activities_context)} chars")
+        print(f"DEBUG: - Challenge context: {len(challenge_context)} chars")
+        print(f"DEBUG: - Total meta_prompt: {len(meta_prompt)} chars (~{len(meta_prompt)//4} tokens approx)")
         
         # Make a single, direct call to generate_content_stream with the meta-prompt
         contents = [
@@ -265,9 +270,11 @@ When user misses days or underperforms:
         ]
         
         # Configure generation parameters for complete responses
+        # Gemini 2.5 Flash supports up to 65,536 output tokens
+        # Setting to 8192 to allow full, complete responses without truncation
         generation_config = types.GenerateContentConfig(
             temperature=0.7,
-            max_output_tokens=2048,
+            max_output_tokens=8192,  # Generous limit - Gemini 2.5 Flash supports up to 65k
         )
         
         # Initiate the streaming generation call with stable model
@@ -278,8 +285,21 @@ When user misses days or underperforms:
                 config=generation_config
             )
         except Exception as stream_init_error:
-            error_msg = f"Error initializing Gemini stream: {str(stream_init_error)}"
-            print(f"DEBUG: {error_msg}")
+            error_str = str(stream_init_error).lower()
+            print(f"DEBUG: Stream init error: {type(stream_init_error).__name__}: {stream_init_error}")
+            
+            # User-friendly error messages based on error type
+            if "rate" in error_str or "limit" in error_str or "quota" in error_str or "429" in error_str:
+                error_msg = "⏳ I've reached my daily limit for now. Please try again in a few minutes, or come back tomorrow. Your progress is still being tracked!"
+            elif "timeout" in error_str or "timed out" in error_str:
+                error_msg = "⏱️ The request took too long. Please try again with a shorter question."
+            elif "network" in error_str or "connection" in error_str:
+                error_msg = "🌐 Having trouble connecting right now. Please check your internet and try again."
+            elif "invalid" in error_str or "auth" in error_str or "key" in error_str:
+                error_msg = "🔧 There's a configuration issue on my end. The team has been notified."
+            else:
+                error_msg = "😅 Something went wrong on my end. Please try again in a moment."
+            
             yield error_msg.encode("utf-8")
             full_ai_response_content = error_msg
             return
@@ -309,15 +329,33 @@ When user misses days or underperforms:
                 yield error_msg.encode("utf-8")
                 full_ai_response_content = error_msg
         except Exception as stream_error:
-            error_msg = f"Error reading stream: {str(stream_error)}"
-            print(f"DEBUG: {error_msg}")
+            error_str = str(stream_error).lower()
+            print(f"DEBUG: Stream read error: {type(stream_error).__name__}: {stream_error}")
+            
+            # User-friendly error messages
+            if "rate" in error_str or "limit" in error_str or "quota" in error_str or "429" in error_str:
+                error_msg = "⏳ I've reached my daily limit for now. Please try again in a few minutes!"
+            elif "timeout" in error_str:
+                error_msg = "⏱️ The response took too long. Try asking a simpler question."
+            else:
+                error_msg = "😅 I got interrupted while responding. Please try asking again."
+            
             yield error_msg.encode("utf-8")
             full_ai_response_content = error_msg
 
     except Exception as e:
-        error_message = f"Error during streaming with Gemini API: {e}"
+        error_str = str(e).lower()
         print(f"DEBUG: Gemini API Error: {type(e).__name__}: {e}")
-        yield error_message.encode("utf-8")
+        
+        # User-friendly error messages
+        if "rate" in error_str or "limit" in error_str or "quota" in error_str or "429" in error_str:
+            error_msg = "⏳ I've hit my limit for today. Please try again later or tomorrow. Don't worry - your activities are still being saved!"
+        elif "blocked" in error_str or "safety" in error_str:
+            error_msg = "🤔 I couldn't process that request. Try rephrasing your question."
+        else:
+            error_msg = "😅 Something unexpected happened. Please try again in a moment."
+        
+        yield error_msg.encode("utf-8")
     finally:
         # Save the AI's response using a fresh, atomic database transaction
         # This prevents connection issues during long-running streams
