@@ -417,11 +417,13 @@ export default function DashboardClientPage({
             </div>
           ) : (
             <div className="w-full max-w-lg space-y-4">
+              {/* TODO: Re-enable when connected to actual AI
               <DailyCoachInsight
                 challengeId={activeChallenge.id}
                 userId={user?.id || ''}
                 onOpenChat={() => window.location.href = '/chat'}
               />
+              */}
               <ChallengeDashboard
                 challenge={activeChallenge}
                 todayMetrics={todayMetrics}
