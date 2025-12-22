@@ -281,21 +281,21 @@ export default function SettingsPage() {
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-4 bg-gray-900/50 h-auto p-1">
-            <TabsTrigger value="account" className="flex flex-col sm:flex-row items-center gap-1 py-2 text-xs sm:text-sm">
-              <UserIcon className="h-4 w-4" />
-              <span>Profile</span>
+            <TabsTrigger value="account" className="flex flex-col items-center gap-0.5 py-2 px-1 text-[10px] sm:text-xs sm:flex-row sm:gap-1.5">
+              <UserIcon className="h-4 w-4 sm:h-4 sm:w-4 flex-shrink-0" />
+              <span className="truncate">Profile</span>
             </TabsTrigger>
-            <TabsTrigger value="challenge" className="flex flex-col sm:flex-row items-center gap-1 py-2 text-xs sm:text-sm">
-              <Trophy className="h-4 w-4" />
-              <span>Challenge</span>
+            <TabsTrigger value="challenge" className="flex flex-col items-center gap-0.5 py-2 px-1 text-[10px] sm:text-xs sm:flex-row sm:gap-1.5">
+              <Trophy className="h-4 w-4 sm:h-4 sm:w-4 flex-shrink-0" />
+              <span className="truncate">Challenge</span>
             </TabsTrigger>
-            <TabsTrigger value="categories" className="flex flex-col sm:flex-row items-center gap-1 py-2 text-xs sm:text-sm">
-              <Palette className="h-4 w-4" />
-              <span>Categories</span>
+            <TabsTrigger value="categories" className="flex flex-col items-center gap-0.5 py-2 px-1 text-[10px] sm:text-xs sm:flex-row sm:gap-1.5">
+              <Palette className="h-4 w-4 sm:h-4 sm:w-4 flex-shrink-0" />
+              <span className="truncate">Categories</span>
             </TabsTrigger>
-            <TabsTrigger value="goals" className="flex flex-col sm:flex-row items-center gap-1 py-2 text-xs sm:text-sm">
-              <Target className="h-4 w-4" />
-              <span>Goals</span>
+            <TabsTrigger value="goals" className="flex flex-col items-center gap-0.5 py-2 px-1 text-[10px] sm:text-xs sm:flex-row sm:gap-1.5">
+              <Target className="h-4 w-4 sm:h-4 sm:w-4 flex-shrink-0" />
+              <span className="truncate">Goals</span>
             </TabsTrigger>
           </TabsList>
 

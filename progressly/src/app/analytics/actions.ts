@@ -19,27 +19,77 @@ async function getAuthHeaders() {
   };
 }
 
+// Helper function to calculate duration in minutes from start_time and end_time
+function calculateDuration(startTime: string, endTime: string): number {
+  if (!startTime || !endTime) return 0;
+  
+  // Parse time strings (HH:MM:SS or HH:MM format)
+  const parseTime = (timeStr: string): number => {
+    const parts = timeStr.split(':').map(Number);
+    return parts[0] * 60 + parts[1]; // Convert to minutes
+  };
+  
+  const startMinutes = parseTime(startTime);
+  const endMinutes = parseTime(endTime);
+  
+  // Handle overnight activities (e.g., 23:00 to 07:00)
+  if (endMinutes < startMinutes) {
+    return (24 * 60) - startMinutes + endMinutes;
+  }
+  
+  return endMinutes - startMinutes;
+}
+
 // Get analytics overview data
 export async function getAnalyticsOverview() {
   try {
     const headers = await getAuthHeaders();
     
-    // Get activities for various time periods
-    const [todayRes, weekRes, monthRes, challengeRes] = await Promise.all([
-      fetch(`${API_BASE_URL}/api/activities?days=1`, { headers }),
-      fetch(`${API_BASE_URL}/api/activities?days=7`, { headers }),
-      fetch(`${API_BASE_URL}/api/activities?days=30`, { headers }),
+    // Get all activities from dashboard-bootstrap and active challenge
+    const [bootstrapRes, challengeRes] = await Promise.all([
+      fetch(`${API_BASE_URL}/api/dashboard-bootstrap`, { headers }),
       fetch(`${API_BASE_URL}/api/challenges/active`, { headers }),
     ]);
 
-    const todayActivities = todayRes.ok ? await todayRes.json() : [];
-    const weekActivities = weekRes.ok ? await weekRes.json() : [];
-    const monthActivities = monthRes.ok ? await monthRes.json() : [];
+    const bootstrapData = bootstrapRes.ok ? await bootstrapRes.json() : { activities_last_3_days: [] };
+    const allActivities = bootstrapData.activities_last_3_days || [];
     const challenge = challengeRes.ok ? await challengeRes.json() : null;
 
-    // Calculate totals
+    // Get date boundaries
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const todayStr = today.toISOString().split('T')[0];
+    
+    const weekAgo = new Date(today);
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const weekAgoStr = weekAgo.toISOString().split('T')[0];
+    
+    const monthAgo = new Date(today);
+    monthAgo.setDate(monthAgo.getDate() - 30);
+    const monthAgoStr = monthAgo.toISOString().split('T')[0];
+
+    // Filter activities by date range
+    const filterByDate = (activities: any[], startDateStr: string) => {
+      return activities.filter((a: any) => {
+        const actDate = a.effective_date || a.activity_date?.split('T')[0];
+        return actDate && actDate >= startDateStr;
+      });
+    };
+
+    const todayActivities = allActivities.filter((a: any) => {
+      const actDate = a.effective_date || a.activity_date?.split('T')[0];
+      return actDate === todayStr;
+    });
+    const weekActivities = filterByDate(allActivities, weekAgoStr);
+    const monthActivities = filterByDate(allActivities, monthAgoStr);
+
+    // Calculate totals - use start_time and end_time to compute duration
     const calcTotal = (activities: any[]) => 
-      activities.reduce((sum, a) => sum + (a.duration || 0), 0);
+      activities.reduce((sum, a) => {
+        const duration = calculateDuration(a.start_time, a.end_time);
+        return sum + duration;
+      }, 0);
 
     const todayTotal = calcTotal(todayActivities);
     const weekTotal = calcTotal(weekActivities);
@@ -49,7 +99,8 @@ export async function getAnalyticsOverview() {
     const categoryBreakdown: Record<string, number> = {};
     weekActivities.forEach((a: any) => {
       const cat = a.category?.name || a.category_name || "Uncategorized";
-      categoryBreakdown[cat] = (categoryBreakdown[cat] || 0) + (a.duration || 0);
+      const duration = calculateDuration(a.start_time, a.end_time);
+      categoryBreakdown[cat] = (categoryBreakdown[cat] || 0) + duration;
     });
 
     // Sort by duration descending
@@ -104,13 +155,24 @@ export async function getAnalyticsOverview() {
 export async function getTrendsData(days: number = 30) {
   try {
     const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE_URL}/api/activities?days=${days}`, { headers });
+    const response = await fetch(`${API_BASE_URL}/api/dashboard-bootstrap`, { headers });
     
     if (!response.ok) {
       return { success: true, data: [] };
     }
 
-    const activities = await response.json();
+    const bootstrapData = await response.json();
+    const allActivities = bootstrapData.activities_last_3_days || [];
+
+    // Filter to last N days
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+    const cutoffStr = cutoffDate.toISOString().split('T')[0];
+    
+    const activities = allActivities.filter((a: any) => {
+      const actDate = a.effective_date || a.activity_date?.split('T')[0];
+      return actDate && actDate >= cutoffStr;
+    });
 
     // Group by date
     const dailyTotals: Record<string, { total: number, categories: Record<string, number> }> = {};
@@ -123,7 +185,7 @@ export async function getTrendsData(days: number = 30) {
         dailyTotals[date] = { total: 0, categories: {} };
       }
       
-      const duration = a.duration || 0;
+      const duration = calculateDuration(a.start_time, a.end_time);
       dailyTotals[date].total += duration;
       
       const cat = a.category?.name || a.category_name || "Other";
@@ -151,21 +213,33 @@ export async function getComparisonData() {
   try {
     const headers = await getAuthHeaders();
     
-    const [targetsRes, categoriesRes, activitiesRes] = await Promise.all([
+    const [targetsRes, categoriesRes, bootstrapRes] = await Promise.all([
       fetch(`${API_BASE_URL}/api/targets`, { headers }),
       fetch(`${API_BASE_URL}/api/categories`, { headers }),
-      fetch(`${API_BASE_URL}/api/activities?days=7`, { headers }),
+      fetch(`${API_BASE_URL}/api/dashboard-bootstrap`, { headers }),
     ]);
 
     const targets = targetsRes.ok ? await targetsRes.json() : [];
     const categories = categoriesRes.ok ? await categoriesRes.json() : [];
-    const activities = activitiesRes.ok ? await activitiesRes.json() : [];
+    const bootstrapData = bootstrapRes.ok ? await bootstrapRes.json() : { activities_last_3_days: [] };
+    const allActivities = bootstrapData.activities_last_3_days || [];
+
+    // Filter to last 7 days
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const weekAgoStr = weekAgo.toISOString().split('T')[0];
+    
+    const activities = allActivities.filter((a: any) => {
+      const actDate = a.effective_date || a.activity_date?.split('T')[0];
+      return actDate && actDate >= weekAgoStr;
+    });
 
     // Calculate actual hours per category (weekly average)
     const actualByCategory: Record<string, number> = {};
     activities.forEach((a: any) => {
       const cat = a.category?.name || a.category_name || "Uncategorized";
-      const hours = (a.duration || 0) / 60; // Convert minutes to hours
+      const durationMinutes = calculateDuration(a.start_time, a.end_time);
+      const hours = durationMinutes / 60; // Convert minutes to hours
       actualByCategory[cat] = (actualByCategory[cat] || 0) + hours;
     });
 

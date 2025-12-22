@@ -122,6 +122,47 @@ def update_challenge_progress(
             if total_commitments > 0:
                 metrics.overall_completion_pct = round((completed_count / total_commitments) * 100, 1)
             
+            # Mark that there was activity today (for consistency)
+            metrics.consistency_score = 100  # Has activity = 100% consistency for the day
+            
+            # Calculate diligence (how much of targets achieved)
+            total_target_pct = 0
+            applicable_count = 0
+            for c_id, status in current_status.items():
+                target = status.get("target")
+                achieved = status.get("achieved", 0)
+                if target and float(target) > 0:
+                    pct = min((float(achieved) / float(target)) * 100, 100)
+                    total_target_pct += pct
+                    applicable_count += 1
+            
+            if applicable_count > 0:
+                metrics.diligence_score = round(total_target_pct / applicable_count, 1)
+            
+            # Recalculate cumulative rates from all metrics in this challenge
+            all_metrics_query = select(DailyChallengeMetrics).where(
+                DailyChallengeMetrics.challenge_id == challenge.id,
+                DailyChallengeMetrics.date <= effective_date
+            ).order_by(DailyChallengeMetrics.date.asc())
+            all_metrics = db.exec(all_metrics_query).all()
+            
+            total_days = len(all_metrics)
+            consistent_days = sum(1 for m in all_metrics if m.consistency_score and m.consistency_score > 0)
+            total_diligence = sum(m.diligence_score or 0 for m in all_metrics)
+            
+            if total_days > 0:
+                metrics.cumulative_consistency_rate = round((consistent_days / total_days) * 100, 1)
+                metrics.cumulative_diligence_rate = round(total_diligence / total_days, 1)
+            
+            # Calculate streak (consecutive days with 70%+ completion)
+            streak = 0
+            for m in reversed(all_metrics):
+                if m.overall_completion_pct and m.overall_completion_pct >= 70:
+                    streak += 1
+                else:
+                    break
+            metrics.consecutive_completion_streak = streak
+            
             db.add(metrics)
             db.commit()
             db.refresh(metrics)

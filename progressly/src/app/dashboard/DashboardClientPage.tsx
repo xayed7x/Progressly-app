@@ -20,6 +20,7 @@ import { ChallengeSetup } from './_components/ChallengeSetup';
 import { ChallengeDashboard } from './_components/ChallengeDashboard';
 import { EndOfDaySummary } from './_components/EndOfDaySummary';
 import { DailyCoachInsight } from './_components/DailyCoachInsight';
+import { DashboardLoading } from './_components/DashboardLoading';
 import { useChallenges } from '@/hooks/useChallenges';
 import type { CommitmentProgress } from '@/lib/types';
 
@@ -75,7 +76,8 @@ export default function DashboardClientPage({
     todayMetrics, 
     currentDayNumber, 
     createChallenge, 
-    refetch: refetchChallenge 
+    refetch: refetchChallenge,
+    isLoading: isLoadingChallenge
   } = useChallenges(user?.id || null);
 
   useEffect(() => {
@@ -385,6 +387,14 @@ export default function DashboardClientPage({
   const displayName = isUserLoading 
     ? 'Achiever' // Show default while loading
     : (user?.user_metadata?.full_name || user?.email || 'Achiever');
+
+
+  // Show beautiful loading screen while data is loading
+  const isDataReady = !isUserLoading && !isLoadingBootstrap && !isLoadingChallenge && !!bootstrapData;
+  
+  if (!isDataReady) {
+    return <DashboardLoading />;
+  }
 
   return (
     <main className="min-h-screen bg-black text-white relative overflow-hidden">
