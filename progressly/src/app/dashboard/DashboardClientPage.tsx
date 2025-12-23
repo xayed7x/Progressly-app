@@ -59,6 +59,7 @@ export default function DashboardClientPage({
   const supabase = getSupabaseBrowserClient();
   const [user, setUser] = useState<User | null>(null);
   const [isUserLoading, setIsUserLoading] = useState(true);
+  const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false); // Track if initial load is complete
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);  // Initialize from effective_date
   const [endedDate, setEndedDate] = useState<string | null>(null);  // Track which date was ended
   const [optimisticActivities, setOptimisticActivities] = useState<
@@ -389,10 +390,19 @@ export default function DashboardClientPage({
     : (user?.user_metadata?.full_name || user?.email || 'Achiever');
 
 
-  // Show beautiful loading screen while data is loading
-  const isDataReady = !isUserLoading && !isLoadingBootstrap && !isLoadingChallenge && !!bootstrapData;
+  // Show beautiful loading screen ONLY on initial page load
+  // Once data has loaded once, don't show again on revalidations
+  const isInitialLoadComplete = !isUserLoading && !isLoadingBootstrap && !isLoadingChallenge && !!bootstrapData;
   
-  if (!isDataReady) {
+  // Mark as initially loaded once all data is ready
+  useEffect(() => {
+    if (isInitialLoadComplete && !hasInitiallyLoaded) {
+      setHasInitiallyLoaded(true);
+    }
+  }, [isInitialLoadComplete, hasInitiallyLoaded]);
+  
+  // Only show loading screen if initial load hasn't completed yet
+  if (!hasInitiallyLoaded && !isInitialLoadComplete) {
     return <DashboardLoading />;
   }
 
