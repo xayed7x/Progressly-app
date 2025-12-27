@@ -13,7 +13,8 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, Cell, Legend
 } from "recharts";
-import { getAnalyticsOverview, getTrendsData, getComparisonData } from "./actions";
+import { getAnalyticsOverview, getTrendsData, getComparisonData, getDailyHistory } from "./actions";
+import { CheckCircle2, XCircle, History } from "lucide-react";
 
 interface OverviewData {
   todayTotal: number;
@@ -40,6 +41,27 @@ interface ComparisonData {
   difference: number;
 }
 
+interface DailyHistoryData {
+  date: string;
+  dayNumber: number;
+  overallCompletion: number;
+  hasActivity: boolean;
+  commitmentDetails: Array<{
+    habit: string;
+    target: number | string;
+    achieved: number;
+    unit: string;
+    isComplete: boolean;
+  }>;
+}
+
+interface ChallengeInfo {
+  name: string;
+  totalDays: number;
+  startDate: string;
+  endDate: string;
+}
+
 const formatDuration = (minutes: number) => {
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
@@ -54,6 +76,8 @@ export default function AnalyticsPage() {
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [trends, setTrends] = useState<TrendData[]>([]);
   const [comparison, setComparison] = useState<ComparisonData[]>([]);
+  const [dailyHistory, setDailyHistory] = useState<DailyHistoryData[]>([]);
+  const [challengeInfo, setChallengeInfo] = useState<ChallengeInfo | null>(null);
   
   const router = useRouter();
 
@@ -61,10 +85,11 @@ export default function AnalyticsPage() {
     const loadData = async () => {
       setIsLoading(true);
       try {
-        const [overviewRes, trendsRes, comparisonRes] = await Promise.all([
+        const [overviewRes, trendsRes, comparisonRes, historyRes] = await Promise.all([
           getAnalyticsOverview(),
           getTrendsData(30),
           getComparisonData(),
+          getDailyHistory(),
         ]);
 
         if (overviewRes.success && overviewRes.data) {
@@ -75,6 +100,12 @@ export default function AnalyticsPage() {
         }
         if (comparisonRes.success && comparisonRes.data) {
           setComparison(comparisonRes.data);
+        }
+        if (historyRes.success && historyRes.data) {
+          setDailyHistory(historyRes.data);
+          if (historyRes.challenge) {
+            setChallengeInfo(historyRes.challenge);
+          }
         }
       } catch (error) {
         console.error("Error loading analytics:", error);
@@ -128,13 +159,13 @@ export default function AnalyticsPage() {
               <Zap className="h-4 w-4" />
               <span>Overview</span>
             </TabsTrigger>
+            <TabsTrigger value="history" className="flex flex-col sm:flex-row items-center gap-1 py-2 text-xs sm:text-sm">
+              <History className="h-4 w-4" />
+              <span>History</span>
+            </TabsTrigger>
             <TabsTrigger value="trends" className="flex flex-col sm:flex-row items-center gap-1 py-2 text-xs sm:text-sm">
               <TrendingUp className="h-4 w-4" />
               <span>Trends</span>
-            </TabsTrigger>
-            <TabsTrigger value="patterns" className="flex flex-col sm:flex-row items-center gap-1 py-2 text-xs sm:text-sm">
-              <Brain className="h-4 w-4" />
-              <span>Patterns</span>
             </TabsTrigger>
             <TabsTrigger value="comparison" className="flex flex-col sm:flex-row items-center gap-1 py-2 text-xs sm:text-sm">
               <Target className="h-4 w-4" />
@@ -354,76 +385,131 @@ export default function AnalyticsPage() {
             </Card>
           </TabsContent>
 
-          {/* ==================== PATTERNS TAB ==================== */}
-          <TabsContent value="patterns" className="space-y-4">
-            <Card className="bg-gray-900/50 backdrop-blur-xl border-gray-800">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center gap-2">
-                  <Lightbulb className="h-5 w-5 text-accent" />
-                  Behavioral Patterns
-                </CardTitle>
-                <CardDescription className="text-gray-400">
-                  Insights based on your activity patterns
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {/* Pattern Cards */}
-                  <div className="bg-black/30 p-4 rounded-xl border border-gray-800">
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 bg-orange-500/10 rounded-lg">
-                        <Brain className="h-5 w-5 text-orange-500" />
+          {/* ==================== HISTORY TAB ==================== */}
+          <TabsContent value="history" className="space-y-4">
+            {/* Challenge Header */}
+            {challengeInfo && (
+              <Card className="bg-gray-900/50 backdrop-blur-xl border-gray-800">
+                <CardContent className="py-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-accent/10 rounded-lg">
+                        <Trophy className="h-5 w-5 text-accent" />
                       </div>
                       <div>
-                        <p className="font-medium text-white">Peak Productivity Hours</p>
-                        <p className="text-sm text-gray-400 mt-1">
-                          Your most productive hours are typically between 9 AM - 12 PM based on your activity data.
+                        <p className="font-medium text-white">{challengeInfo.name}</p>
+                        <p className="text-sm text-gray-400">
+                          Day {dailyHistory.length > 0 ? dailyHistory[0].dayNumber : 1} of {challengeInfo.totalDays}
                         </p>
                       </div>
                     </div>
-                  </div>
-
-                  <div className="bg-black/30 p-4 rounded-xl border border-gray-800">
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 bg-green-500/10 rounded-lg">
-                        <TrendingUp className="h-5 w-5 text-green-500" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-white">Weekly Trends</p>
-                        <p className="text-sm text-gray-400 mt-1">
-                          You tend to be more consistent on weekdays. Consider scheduling important tasks during these times.
-                        </p>
-                      </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-accent">
+                        {dailyHistory.length > 0 ? Math.round(dailyHistory.filter(d => d.overallCompletion >= 70).length / dailyHistory.length * 100) : 0}%
+                      </p>
+                      <p className="text-xs text-gray-400">Success Rate</p>
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+            )}
 
-                  <div className="bg-black/30 p-4 rounded-xl border border-gray-800">
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 bg-blue-500/10 rounded-lg">
-                        <Target className="h-5 w-5 text-blue-500" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-white">Category Focus</p>
-                        <p className="text-sm text-gray-400 mt-1">
-                          Your top category receives the most attention. Consider balancing time across other important areas.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+            {/* Daily History Cards - Scrollable */}
+            <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
+              {dailyHistory.length > 0 ? (
+                dailyHistory.map((day) => {
+                  const completionColor = day.overallCompletion >= 100 
+                    ? 'text-green-400 bg-green-500/10' 
+                    : day.overallCompletion >= 70 
+                      ? 'text-accent bg-accent/10' 
+                      : day.overallCompletion > 0 
+                        ? 'text-orange-400 bg-orange-500/10' 
+                        : 'text-gray-400 bg-gray-800/50';
+                  
+                  return (
+                    <Card key={day.date} className="bg-gray-900/50 backdrop-blur-xl border-gray-800">
+                      <CardContent className="py-4">
+                        {/* Header: Date & Percentage */}
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <div className={`p-2 rounded-lg ${completionColor}`}>
+                              <Calendar className="h-4 w-4" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-white">
+                                {new Date(day.date).toLocaleDateString('en-US', { 
+                                  weekday: 'short', 
+                                  month: 'short', 
+                                  day: 'numeric' 
+                                })}
+                              </p>
+                              <p className="text-xs text-gray-500">Day {day.dayNumber}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className={`text-2xl font-bold ${day.overallCompletion >= 70 ? 'text-accent' : day.overallCompletion > 0 ? 'text-orange-400' : 'text-gray-500'}`}>
+                              {day.overallCompletion}%
+                            </p>
+                          </div>
+                        </div>
 
-                <div className="mt-6 text-center">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => router.push('/dashboard')}
-                    className="gap-2"
-                  >
-                    <Lightbulb className="h-4 w-4" />
-                    View Detailed Patterns on Dashboard
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+                        {/* Progress Bar */}
+                        <div className="w-full h-2 bg-gray-800 rounded-full mb-3 overflow-hidden">
+                          <div 
+                            className={`h-full rounded-full transition-all duration-300 ${
+                              day.overallCompletion >= 100 
+                                ? 'bg-green-500' 
+                                : day.overallCompletion >= 70 
+                                  ? 'bg-accent' 
+                                  : day.overallCompletion > 0 
+                                    ? 'bg-orange-500' 
+                                    : 'bg-gray-700'
+                            }`}
+                            style={{ width: `${Math.min(day.overallCompletion, 100)}%` }}
+                          />
+                        </div>
+
+                        {/* Commitments Breakdown */}
+                        <div className="space-y-2">
+                          {day.commitmentDetails.map((comm, idx) => (
+                            <div 
+                              key={idx} 
+                              className="flex items-center justify-between text-sm py-1 border-t border-gray-800 first:border-0 first:pt-0"
+                            >
+                              <div className="flex items-center gap-2">
+                                {comm.isComplete ? (
+                                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                                ) : (
+                                  <XCircle className="h-4 w-4 text-gray-500" />
+                                )}
+                                <span className="text-gray-300">{comm.habit}</span>
+                              </div>
+                              <span className={`${comm.isComplete ? 'text-green-400' : 'text-gray-500'}`}>
+                                {comm.achieved} / {comm.target} {comm.unit}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })
+              ) : (
+                <Card className="bg-gray-900/50 backdrop-blur-xl border-gray-800">
+                  <CardContent className="py-12 text-center">
+                    <History className="h-12 w-12 text-gray-600 mx-auto mb-4" />
+                    <p className="text-gray-400">No challenge history yet</p>
+                    <p className="text-sm text-gray-500 mt-1">Start a challenge to track your daily progress</p>
+                    <Button 
+                      className="mt-4" 
+                      onClick={() => router.push('/dashboard')}
+                    >
+                      Go to Dashboard
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           </TabsContent>
 
           {/* ==================== COMPARISON TAB ==================== */}

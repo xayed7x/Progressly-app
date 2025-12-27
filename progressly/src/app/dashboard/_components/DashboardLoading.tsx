@@ -1,7 +1,6 @@
 'use client';
 
-import { motion } from 'framer-motion';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Image from 'next/image';
 
 // Motivational quotes about consistency - one will be shown per app start
@@ -26,137 +25,52 @@ export function DashboardLoading() {
 
   return (
     <div className="fixed inset-0 bg-black z-50 flex flex-col items-center justify-center">
-      {/* Background Gradients */}
+      {/* Simple static background gradients - no animation for performance */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <motion.div 
-          className="absolute top-[-20%] left-[-20%] w-[60%] h-[60%] bg-accent/20 rounded-full blur-[120px]"
-          animate={{ 
-            scale: [1, 1.2, 1],
-            opacity: [0.2, 0.3, 0.2]
-          }}
-          transition={{ 
-            duration: 4, 
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-        />
-        <motion.div 
-          className="absolute bottom-[-20%] right-[-20%] w-[60%] h-[60%] bg-blue-500/20 rounded-full blur-[120px]"
-          animate={{ 
-            scale: [1.2, 1, 1.2],
-            opacity: [0.3, 0.2, 0.3]
-          }}
-          transition={{ 
-            duration: 4, 
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-        />
+        <div className="absolute top-[-20%] left-[-20%] w-[50%] h-[50%] bg-accent/15 rounded-full blur-3xl" />
+        <div className="absolute bottom-[-20%] right-[-20%] w-[50%] h-[50%] bg-blue-500/15 rounded-full blur-3xl" />
       </div>
 
       {/* Content */}
-      <div className="relative z-10 flex flex-col items-center gap-8 px-6 max-w-md">
-        {/* Logo with Pulse Animation */}
-        <motion.div
-          className="relative"
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.5 }}
-        >
-          {/* Outer Glow Ring */}
-          <motion.div
-            className="absolute -inset-4 rounded-xl bg-gradient-to-r from-accent/30 to-blue-500/30 blur-xl"
-            animate={{ 
-              scale: [1, 1.1, 1],
-              opacity: [0.5, 0.8, 0.5]
-            }}
-            transition={{ 
-              duration: 2, 
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-          />
+      <div className="relative z-10 flex flex-col items-center gap-6 px-6 max-w-sm animate-fadeIn">
+        {/* Logo with simple CSS animation */}
+        <div className="relative animate-pulse-slow">
+          {/* Subtle glow */}
+          <div className="absolute -inset-3 rounded-xl bg-accent/20 blur-lg" />
           
           {/* Logo Container */}
-          <motion.div
-            className="relative w-24 h-24 rounded-xl bg-black/50 backdrop-blur-sm flex items-center justify-center border border-white/10"
-            animate={{ 
-              rotate: [0, 5, -5, 0]
-            }}
-            transition={{ 
-              duration: 4, 
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-          >
+          <div className="relative w-20 h-20 rounded-xl bg-black/60 flex items-center justify-center border border-white/10">
             <Image
               src="/images/logo.png"
               alt="Progressly"
-              width={64}
-              height={64}
+              width={56}
+              height={56}
               className="object-contain"
               priority
             />
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
 
         {/* Brand Name */}
-        <motion.h1
-          className="text-2xl font-bold bg-gradient-to-r from-accent via-yellow-400 to-accent bg-clip-text text-transparent"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.5 }}
-        >
+        <h1 className="text-xl font-bold text-accent animate-fadeIn">
           Progressly
-        </motion.h1>
+        </h1>
 
         {/* Motivational Quote */}
-        <motion.p
-          className="text-gray-300 text-center text-sm italic leading-relaxed"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5, duration: 0.8 }}
-        >
+        <p className="text-gray-400 text-center text-sm italic leading-relaxed animate-fadeIn animation-delay-200">
           "{quote}"
-        </motion.p>
+        </p>
 
-        {/* Progress Bar */}
-        <motion.div
-          className="w-48 h-1 bg-white/10 rounded-full overflow-hidden"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.6, duration: 0.3 }}
-        >
-          <motion.div
-            className="h-full bg-gradient-to-r from-accent to-blue-500 rounded-full"
-            initial={{ width: "0%" }}
-            animate={{ width: "100%" }}
-            transition={{ 
-              duration: 2.5,
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-          />
-        </motion.div>
+        {/* Simple Progress Bar with CSS animation */}
+        <div className="w-40 h-1 bg-white/10 rounded-full overflow-hidden">
+          <div className="h-full w-full bg-gradient-to-r from-accent to-blue-500 rounded-full animate-loading-bar" />
+        </div>
 
-        {/* Animated Dots */}
-        <div className="flex gap-2">
-          {[0, 1, 2].map((i) => (
-            <motion.div
-              key={i}
-              className="w-2 h-2 rounded-full bg-accent/50"
-              animate={{ 
-                scale: [1, 1.5, 1],
-                opacity: [0.5, 1, 0.5]
-              }}
-              transition={{ 
-                duration: 1,
-                repeat: Infinity,
-                delay: i * 0.2,
-                ease: "easeInOut"
-              }}
-            />
-          ))}
+        {/* Simple loading dots */}
+        <div className="flex gap-1.5">
+          <div className="w-1.5 h-1.5 rounded-full bg-accent/60 animate-bounce-dot" style={{ animationDelay: '0ms' }} />
+          <div className="w-1.5 h-1.5 rounded-full bg-accent/60 animate-bounce-dot" style={{ animationDelay: '150ms' }} />
+          <div className="w-1.5 h-1.5 rounded-full bg-accent/60 animate-bounce-dot" style={{ animationDelay: '300ms' }} />
         </div>
       </div>
     </div>

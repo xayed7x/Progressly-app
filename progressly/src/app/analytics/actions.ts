@@ -272,3 +272,132 @@ export async function getComparisonData() {
     return { success: false, error: error.message };
   }
 }
+
+// Get daily challenge history (for the History tab)
+export async function getDailyHistory() {
+  try {
+    const headers = await getAuthHeaders();
+    
+    // Get active challenge
+    const challengeRes = await fetch(`${API_BASE_URL}/api/challenges/active`, { headers });
+    
+    if (!challengeRes.ok) {
+      return { success: true, data: [], challenge: null };
+    }
+    
+    const challenge = await challengeRes.json();
+    if (!challenge || !challenge.id) {
+      return { success: true, data: [], challenge: null };
+    }
+    
+    // Fetch daily metrics from Supabase directly using the API
+    // We'll use the dashboard-bootstrap which has activities
+    const bootstrapRes = await fetch(`${API_BASE_URL}/api/dashboard-bootstrap`, { headers });
+    const bootstrapData = bootstrapRes.ok ? await bootstrapRes.json() : { activities_last_3_days: [] };
+    
+    // Group activities by date and calculate completion
+    const allActivities = bootstrapData.activities_last_3_days || [];
+    const commitments = challenge.commitments || [];
+    
+    // Get all dates from challenge start to today
+    const startDate = new Date(challenge.start_date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const dailyMetrics: Array<{
+      date: string;
+      dayNumber: number;
+      overallCompletion: number;
+      hasActivity: boolean;
+      commitmentDetails: Array<{
+        habit: string;
+        target: number | string;
+        achieved: number;
+        unit: string;
+        isComplete: boolean;
+      }>;
+    }> = [];
+    
+    // Calculate metrics for each day
+    for (let d = new Date(startDate); d <= today; d.setDate(d.getDate() + 1)) {
+      const dateStr = d.toISOString().split('T')[0];
+      const dayNum = Math.floor((d.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      
+      // Get activities for this day
+      const dayActivities = allActivities.filter((a: any) => {
+        const actDate = a.effective_date || a.activity_date?.split('T')[0];
+        return actDate === dateStr;
+      });
+      
+      // Calculate commitment progress
+      const commitmentDetails: Array<{
+        habit: string;
+        target: number | string;
+        achieved: number;
+        unit: string;
+        isComplete: boolean;
+      }> = [];
+      
+      let totalCompletion = 0;
+      let commitmentCount = 0;
+      
+      for (const comm of commitments) {
+        const categoryName = comm.category || comm.habit;
+        const relevantActivities = dayActivities.filter((a: any) => 
+          a.category?.name?.toLowerCase() === categoryName?.toLowerCase() ||
+          a.activity_name?.toLowerCase().includes(comm.habit?.toLowerCase())
+        );
+        
+        let achieved = 0;
+        if (comm.unit === 'hours' || comm.unit === 'minutes') {
+          const totalMinutes = relevantActivities.reduce((sum: number, a: any) => {
+            return sum + calculateDuration(a.start_time, a.end_time);
+          }, 0);
+          achieved = comm.unit === 'hours' ? totalMinutes / 60 : totalMinutes;
+        } else {
+          achieved = relevantActivities.length > 0 ? 1 : 0;
+        }
+        
+        const target = typeof comm.target === 'number' ? comm.target : 1;
+        const completion = Math.min((achieved / target) * 100, 100);
+        totalCompletion += completion;
+        commitmentCount++;
+        
+        commitmentDetails.push({
+          habit: comm.habit,
+          target: comm.target,
+          achieved: Math.round(achieved * 100) / 100,
+          unit: comm.unit || '',
+          isComplete: completion >= 100
+        });
+      }
+      
+      const overallCompletion = commitmentCount > 0 ? Math.round(totalCompletion / commitmentCount) : 0;
+      
+      dailyMetrics.push({
+        date: dateStr,
+        dayNumber: dayNum,
+        overallCompletion,
+        hasActivity: dayActivities.length > 0,
+        commitmentDetails
+      });
+    }
+    
+    // Reverse to show most recent first
+    dailyMetrics.reverse();
+    
+    return { 
+      success: true, 
+      data: dailyMetrics,
+      challenge: {
+        name: challenge.name,
+        totalDays: challenge.duration_days,
+        startDate: challenge.start_date,
+        endDate: challenge.end_date
+      }
+    };
+  } catch (error: any) {
+    console.error("getDailyHistory error:", error);
+    return { success: false, error: error.message };
+  }
+}
