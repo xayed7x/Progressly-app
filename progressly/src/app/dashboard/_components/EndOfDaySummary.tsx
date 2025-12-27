@@ -80,14 +80,45 @@ export function EndOfDaySummary({
     return Math.floor((current.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
   }, [challenge.start_date, today]);
 
-  // Detect time gaps
+  // Detect time gaps - only BETWEEN logged activities, not to end of day
   useMemo(() => {
-    const gaps = metricsService.detectMissingTimeBlocks(activities);
-    setTimeGaps(gaps.map((g, i) => ({ 
-      ...g, 
-      id: `gap-${i}`,
-      filled: false 
-    })));
+    if (activities.length < 2) {
+      setTimeGaps([]);
+      return;
+    }
+    
+    // Sort activities by start time
+    const sorted = [...activities].sort((a, b) => 
+      a.start_time.localeCompare(b.start_time)
+    );
+    
+    const gaps: TimeGap[] = [];
+    
+    // Only check gaps BETWEEN consecutive activities
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const currentEnd = sorted[i].end_time;
+      const nextStart = sorted[i + 1].start_time;
+      
+      if (nextStart > currentEnd) {
+        // Calculate gap duration
+        const [h1, m1] = currentEnd.split(':').map(Number);
+        const [h2, m2] = nextStart.split(':').map(Number);
+        const gapMinutes = (h2 * 60 + m2) - (h1 * 60 + m1);
+        
+        // Only report gaps > 30 minutes
+        if (gapMinutes > 30) {
+          gaps.push({
+            id: `gap-${i}`,
+            start: currentEnd,
+            end: nextStart,
+            duration_minutes: gapMinutes,
+            filled: false
+          });
+        }
+      }
+    }
+    
+    setTimeGaps(gaps);
   }, [activities]);
 
   const totalLogged = useMemo(() => {
@@ -222,8 +253,30 @@ export function EndOfDaySummary({
             <h3 className="font-medium mb-3">Today's Goal Status</h3>
             <div className="space-y-2">
               {challenge.commitments.map((commitment) => {
-                const progress = commitmentProgress[commitment.id];
-                const isComplete = progress?.status === 'complete';
+                // Calculate actual progress from activities
+                const categoryName = commitment.category || commitment.habit;
+                const relevantActivities = activities.filter((a) => 
+                  a.category?.name?.toLowerCase() === categoryName?.toLowerCase() ||
+                  a.activity_name?.toLowerCase().includes(commitment.habit?.toLowerCase())
+                );
+                
+                // Calculate total time for this category
+                let actual = 0;
+                if (commitment.unit === 'hours' || commitment.unit === 'minutes') {
+                  const totalMinutes = relevantActivities.reduce((sum, a) => {
+                    const [h1, m1] = a.start_time.split(':').map(Number);
+                    const [h2, m2] = a.end_time.split(':').map(Number);
+                    return sum + ((h2 * 60 + m2) - (h1 * 60 + m1));
+                  }, 0);
+                  actual = commitment.unit === 'hours' 
+                    ? Math.round((totalMinutes / 60) * 10) / 10 
+                    : totalMinutes;
+                } else {
+                  actual = relevantActivities.length > 0 ? 1 : 0;
+                }
+                
+                const target = typeof commitment.target === 'number' ? commitment.target : 1;
+                const isComplete = actual >= target;
                 
                 return (
                   <div key={commitment.id} className="flex items-center justify-between text-sm">
@@ -231,7 +284,7 @@ export function EndOfDaySummary({
                     <span className={`flex items-center gap-1 ${isComplete ? 'text-green-600' : 'text-orange-600'}`}>
                       {commitment.target === 'complete' 
                         ? (isComplete ? '✓ Complete' : '○ Not done')
-                        : `${progress?.actual || 0}/${commitment.target} ${commitment.unit}`
+                        : `${actual}/${commitment.target} ${commitment.unit}`
                       }
                       {isComplete ? <Check className="w-4 h-4" /> : null}
                     </span>
@@ -301,7 +354,11 @@ export function EndOfDaySummary({
           <Button variant="outline" onClick={onClose} className="flex-1">
             Continue Later
           </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting} className="flex-1">
+          <Button 
+            onClick={handleSubmit} 
+            disabled={isSubmitting} 
+            className="flex-1 bg-accent text-black hover:bg-accent/90"
+          >
             {isSubmitting ? 'Saving...' : 'Save & Complete Day'}
           </Button>
         </div>
