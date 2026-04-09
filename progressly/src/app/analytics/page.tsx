@@ -320,7 +320,7 @@ export default function AnalyticsPage() {
                           borderRadius: '8px'
                         }}
                         labelStyle={{ color: '#fff' }}
-                        formatter={(value: number) => [formatDuration(value), 'Total']}
+                        formatter={(value) => [formatDuration(value as number), 'Total']}
                         labelFormatter={(label) => new Date(label).toLocaleDateString()}
                       />
                       <Line 
@@ -371,7 +371,7 @@ export default function AnalyticsPage() {
                           border: '1px solid #333',
                           borderRadius: '8px'
                         }}
-                        formatter={(value: number) => [formatDuration(value), 'Total']}
+                        formatter={(value) => [formatDuration(value as number), 'Total']}
                       />
                       <Bar dataKey="total" fill="#f5c542" radius={[4, 4, 0, 0]} />
                     </BarChart>
