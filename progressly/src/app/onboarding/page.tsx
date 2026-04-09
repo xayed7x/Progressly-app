@@ -8,10 +8,17 @@ import { getSupabaseBrowserClient } from "@/lib/supabase-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, ArrowRight, Check, Target, Clock } from "lucide-react";
+import { Loader2, ArrowRight, Check, Target, Clock, Sparkles, X, Plus, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { createGoal, saveDailyTarget, getCategories } from "@/app/settings/actions";
 import { defaultActivityCategories, defaultCategoryHexColors } from "@/lib/constants";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const onboardingPlaceholders = [
   "Become a Doctor",
@@ -24,7 +31,7 @@ const onboardingPlaceholders = [
   1500,
 ];
 
-type Step = 1 | 2;
+type Step = 1 | 2 | 3;
 
 export default function OnboardingPage() {
   const [step, setStep] = useState<Step>(1);
@@ -34,6 +41,14 @@ export default function OnboardingPage() {
   const [goal, setGoal] = useState("");
   const [categories, setCategories] = useState<any[]>([]);
   const [targets, setTargets] = useState<Record<string, { hours: string; minutes: string }>>({});
+  
+  // Challenge creation state
+  const [challengeName, setChallengeName] = useState("");
+  const [challengeDuration, setChallengeDuration] = useState(100);
+  const [commitments, setCommitments] = useState<any[]>([]);
+  const [showAddCommitment, setShowAddCommitment] = useState(false);
+  const [newCommitment, setNewCommitment] = useState({ habit: '', category: '', unit: 'hours', target: 1 });
+  const [isCreatingChallenge, setIsCreatingChallenge] = useState(false);
   
   const router = useRouter();
   const supabase = getSupabaseBrowserClient();
@@ -143,18 +158,9 @@ export default function OnboardingPage() {
         }
       }
 
-      setLoadingMessage("Preparing your dashboard...");
-      setLoadingProgress(100);
-
-      // Small delay to show completion
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      toast({
-        title: "Setup Complete!",
-        description: "Welcome to Progressly. Let's start tracking your progress!",
-      });
-
-      router.push("/dashboard");
+      // Move to challenge creation step
+      setIsLoading(false);
+      setStep(3);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -165,6 +171,75 @@ export default function OnboardingPage() {
       setLoadingProgress(0);
       setLoadingMessage("");
     }
+  };
+
+  const handleSkipChallenge = () => {
+    toast({
+      title: "Setup Complete!",
+      description: "Welcome to Progressly. You can create a challenge anytime from settings!",
+    });
+    router.push("/dashboard");
+  };
+
+  const handleCreateChallenge = async () => {
+    if (!challengeName.trim() || commitments.length === 0) return;
+    
+    setIsCreatingChallenge(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Not authenticated");
+      
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/challenges`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          name: challengeName,
+          start_date: new Date().toISOString().split('T')[0],
+          duration_days: challengeDuration,
+          commitments: commitments,
+          status: 'active'
+        }),
+      });
+      
+      if (!response.ok) throw new Error("Failed to create challenge");
+      
+      toast({
+        title: "Challenge Created!",
+        description: "Let's start your transformation journey!",
+      });
+      
+      router.push("/dashboard");
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create challenge",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreatingChallenge(false);
+    }
+  };
+
+  const handleAddCommitment = () => {
+    if (!newCommitment.habit || !newCommitment.category) return;
+    
+    setCommitments([...commitments, {
+      id: Date.now().toString(),
+      habit: newCommitment.habit,
+      category: newCommitment.category,
+      target: newCommitment.unit === 'complete' ? 'complete' : newCommitment.target,
+      unit: newCommitment.unit === 'complete' ? null : newCommitment.unit,
+      frequency: 'daily'
+    }]);
+    setNewCommitment({ habit: '', category: '', unit: 'hours', target: 1 });
+    setShowAddCommitment(false);
+  };
+
+  const handleRemoveCommitment = (id: string) => {
+    setCommitments(commitments.filter(c => c.id !== id));
   };
 
   return (
@@ -179,8 +254,9 @@ export default function OnboardingPage() {
         <div className="mb-8 text-center">
             <h1 className="text-3xl font-bold mb-2">Welcome to Progressly</h1>
             <div className="flex justify-center gap-2 mb-8">
-                <div className={`h-2 w-16 rounded-full transition-colors ${step === 1 ? 'bg-accent' : 'bg-gray-700'}`} />
-                <div className={`h-2 w-16 rounded-full transition-colors ${step === 2 ? 'bg-accent' : 'bg-gray-700'}`} />
+                <div className={`h-2 w-12 rounded-full transition-colors ${step >= 1 ? 'bg-accent' : 'bg-gray-700'}`} />
+                <div className={`h-2 w-12 rounded-full transition-colors ${step >= 2 ? 'bg-accent' : 'bg-gray-700'}`} />
+                <div className={`h-2 w-12 rounded-full transition-colors ${step >= 3 ? 'bg-accent' : 'bg-gray-700'}`} />
             </div>
         </div>
 
@@ -321,7 +397,7 @@ export default function OnboardingPage() {
                 >
                   {!isLoading ? (
                     <span className="flex items-center gap-2">
-                      Finish Setup <Check className="w-5 h-5" />
+                      Next Step <ArrowRight className="w-5 h-5" />
                     </span>
                   ) : (
                     <span className="flex items-center gap-2">
@@ -347,6 +423,170 @@ export default function OnboardingPage() {
                     </p>
                   </div>
                 )}
+              </div>
+            </motion.div>
+          )}
+
+          {step === 3 && (
+            <motion.div
+              key="step3"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="bg-gray-900/50 backdrop-blur-xl border border-gray-800 p-8 rounded-3xl"
+            >
+              <div className="mb-6 text-center">
+                <div className="w-16 h-16 bg-purple-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Sparkles className="w-8 h-8 text-purple-500" />
+                </div>
+                <h2 className="text-2xl font-bold mb-2">Create a Challenge</h2>
+                <p className="text-gray-400">Start a 100-day consistency challenge to transform your habits</p>
+                <p className="text-sm text-gray-500 mt-2">(Optional - You can skip this)</p>
+              </div>
+
+              {/* Challenge Setup Form */}
+              <div className="space-y-4 mb-6">
+                <div className="space-y-2">
+                  <Label htmlFor="challengeName" className="text-gray-300">Challenge Name</Label>
+                  <Input
+                    id="challengeName"
+                    placeholder="e.g., 100 Days of Deep Work"
+                    value={challengeName}
+                    onChange={(e) => setChallengeName(e.target.value)}
+                    className="bg-black/50 border-gray-700 text-white h-12"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-gray-300">Duration</Label>
+                  <Select 
+                    value={challengeDuration.toString()} 
+                    onValueChange={(v) => setChallengeDuration(parseInt(v))}
+                  >
+                    <SelectTrigger className="bg-black/50 border-gray-700 text-white h-12">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-900 border-gray-800 z-[200]">
+                      <SelectItem value="30">30 Days - Starter</SelectItem>
+                      <SelectItem value="66">66 Days - Habit Formation</SelectItem>
+                      <SelectItem value="100">100 Days - Full Transformation</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-gray-300">Commitments</Label>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => setShowAddCommitment(true)}
+                      className="text-accent hover:text-accent/80 h-8"
+                    >
+                      <Plus className="w-4 h-4 mr-1" /> Add
+                    </Button>
+                  </div>
+                  
+                  {commitments.length === 0 ? (
+                    <p className="text-sm text-gray-500 text-center py-4 border border-dashed border-gray-800 rounded-lg">
+                      Add at least one commitment
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {commitments.map((c) => (
+                        <div key={c.id} className="flex items-center justify-between p-3 bg-black/30 rounded-lg border border-gray-800">
+                          <div>
+                            <p className="text-white font-medium">{c.habit}</p>
+                            <p className="text-xs text-gray-500">{c.category}</p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleRemoveCommitment(c.id)}
+                            className="text-gray-500 hover:text-red-500 h-8 w-8"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Add Commitment Form */}
+                {showAddCommitment && (
+                  <div className="border border-gray-800 rounded-lg p-4 space-y-3 bg-black/30">
+                    <div className="space-y-2">
+                      <Label className="text-gray-400 text-sm">Habit Name</Label>
+                      <Input
+                        placeholder="e.g., Study, Exercise"
+                        value={newCommitment.habit}
+                        onChange={(e) => setNewCommitment({...newCommitment, habit: e.target.value})}
+                        className="bg-black/50 border-gray-700 h-10"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-gray-400 text-sm">Category</Label>
+                      <Select
+                        value={newCommitment.category}
+                        onValueChange={(v) => setNewCommitment({...newCommitment, category: v})}
+                      >
+                        <SelectTrigger className="bg-black/50 border-gray-700 h-10">
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-gray-900 border-gray-800 z-[200]">
+                          {categories.map(cat => (
+                            <SelectItem key={cat.id || cat.name} value={cat.name}>
+                              {cat.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setShowAddCommitment(false)}
+                        className="border-gray-700 text-gray-400"
+                      >
+                        Cancel
+                      </Button>
+                      <Button 
+                        size="sm"
+                        onClick={handleAddCommitment}
+                        className="bg-accent text-black hover:bg-accent/90"
+                      >
+                        Add
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-3">
+                <Button
+                  onClick={handleCreateChallenge}
+                  disabled={isCreatingChallenge || !challengeName.trim() || commitments.length === 0}
+                  className="w-full h-12 bg-accent text-black hover:bg-accent/90 rounded-xl font-bold"
+                >
+                  {isCreatingChallenge ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      Start Challenge <Sparkles className="w-4 h-4" />
+                    </span>
+                  )}
+                </Button>
+                
+                <Button
+                  variant="ghost"
+                  onClick={handleSkipChallenge}
+                  className="w-full h-10 text-gray-500 hover:text-white"
+                >
+                  Skip for now
+                </Button>
               </div>
             </motion.div>
           )}
